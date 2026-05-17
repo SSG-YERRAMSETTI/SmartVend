@@ -1,0 +1,46 @@
+# ─── Environment variables — NEVER commit these ───
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ─── Node ───
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# ─── Generated / uploaded files ───
+backend/uploads/
+backend/uploads_searchable/
+backend/debug_receipts/
+triage_output.json
+
+# ─── Database backups — keep locally, don't commit ───
+localdb/*.backup
+
+# ─── Build artifacts ───
+build/
+coverage/
+.pytest_cache/
+*.log
+
+# ─── Editor ───
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Bun ───
+bun.lockb
