@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment / secrets — NEVER commit these
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Backend runtime artifacts
+backend/uploads/
+backend/uploads_searchable/
+backend/debug_receipts/
