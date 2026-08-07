@@ -181,7 +181,7 @@ non-functional after multi-tenancy was added (it created products without an
   earlier pass, now genuinely wired up; notifications show real low-stock
   and completed-trip data instead of placeholder content
 
-### Feature 7 — customizable dashboard + AI assistant
+### Feature  — customizable dashboard + AI assistant
 - **Customizable dashboard**: 10 real widgets (stats, low stock, active
   trips, top products by margin, expiring soon, margin snapshot, recent
   tickets, team, recent trips, expenses summary) that any route owner can
@@ -209,38 +209,7 @@ non-functional after multi-tenancy was added (it created products without an
 
 ---
 
-## What's NOT built yet
 
-Being direct about this rather than letting it be discovered later:
-
-1. **Feature 2 — demand-driven route suggestions.** Needs a real SeedLive/
-   Cantaloupe Seed API connection. This requires the user's own Cantaloupe
-   account credentials (their existing machines' Telemetry IDs are already
-   in Cantaloupe's ePort format, so the hardware relationship likely already
-   exists) — not something that can be built without those credentials.
-2. **Feature 7 is built** (see above) but the live Gemini conversation loop
-   itself is unverified end-to-end — get a free key from
-   https://aistudio.google.com and drop it in as `GEMINI_API_KEY` to actually
-   try it.
-3. **No real sales/vend data model.** Restocking moves inventory; nothing yet
-   records an actual sale/vend transaction. This is why the Reports page
-   correctly shows $0 revenue — it's not wired to fake numbers, it's honestly
-   waiting on this piece.
-4. **The Gemini, GLM-OCR, and Claude API calls are implemented but not
-   live-tested** from this development environment (no network access to
-   `generativelanguage.googleapis.com` or `bigmodel.cn`, and no API keys
-   configured here). The rest of the receipts pipeline (file conversion,
-   database writes, matching logic, safeguards) *was* tested end-to-end
-   using real receipt data with the AI call mocked — the only untested piece
-   is the literal external API call, which follows each provider's
-   documented request format. **Gemini is set as the default provider** —
-   it's genuinely free, so this is the one to try first; get a key at
-   https://aistudio.google.com and drop it into `backend/.env`.
-5. **Sales/Payments and Telemetry pages** don't exist yet.
-6. `api_rate_limits` table exists in the schema (inherited from the original
-   scaffold) but has no model or logic behind it — harmless, unused.
-
----
 
 ## Future plans
 
