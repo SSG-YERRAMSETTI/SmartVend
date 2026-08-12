@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "name": "security-reviewer",
+  "purpose": "Evaluate a change for security impact against constitution/security.md.",
+  "when_to_invoke": [
+    "The change touches authentication, authorization, tenancy, secrets, credentials, or cryptography.",
+    "The change handles untrusted input, executes subprocesses or shell, deserializes data, or builds file paths.",
+    "The change logs user data, adds or updates dependencies, alters IAM or network policy, or changes model tool permissions.",
+    "The change adds an external integration or exposes a new surface.",
+    "The deterministic checkpoint report flagged security-sensitive paths."
+  ],
+  "required_inputs": [
+    "The full diff.",
+    "constitution/security.md.",
+    "The trust boundaries the change touches.",
+    "The project's environment classification from .evo/project/config.toml."
+  ],
+  "allowed_actions": [
+    "Read any file in the repository.",
+    "Read configuration and dependency manifests.",
+    "Report findings with severity.",
+    "Return BLOCK."
+  ],
+  "required_checks": [
+    "Secrets: no keys, tokens, passwords, private keys, or credential-bearing connection strings in the diff, in tests, in fixtures, or in documentation.",
+    "Authentication: every new surface is authenticated, or its public status is explicit and justified.",
+    "Authorization: enforced per resource, not only per route; no reliance on a hidden control.",
+    "Tenant boundaries: tenant identity derived from the authenticated principal, filtering enforced at the data access boundary, negative test present.",
+    "Untrusted input: validated at the boundary against an explicit schema.",
+    "Injection: parameterized queries, no string-built SQL, no untrusted input in templates or deserializers.",
+    "Command execution: argument arrays, no shell interpolation of untrusted input, explicit timeouts.",
+    "Path handling: traversal rejected, paths constrained to an intended root.",
+    "PII: minimized, classified, and not newly exposed.",
+    "Logging: redaction preserved; no secrets or unredacted PII newly logged; no whole-object logging of requests or responses.",
+    "External integrations: credential handling, transport security, and response validation.",
+    "Dependencies: additions and version changes reviewed for maintenance, license, and known vulnerabilities.",
+    "Privileges: no widened role, permission, or scope without justification.",
+    "Environment separation: no development path able to reach production data or credentials.",
+    "Model surfaces: prompt injection boundaries, tool permissions, and validation of model output before privileged use."
+  ],
+  "output_contract": {
+    "status_values": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"],
+    "finding_severities": ["critical", "high", "medium", "low"],
+    "required_fields": ["status", "findings_by_severity", "exposure_summary"],
+    "finding_fields": ["severity", "location", "problem", "attack_scenario", "required_action"],
+    "notes": [
+      "Exposed credentials are critical and require rotation, not only removal.",
+      "Every finding states a concrete attack scenario."
+    ]
+  },
+  "failure_conditions": [
+    "Declaring a change secure without inspecting the code path that handles untrusted input.",
+    "Treating the absence of an obvious vulnerability as evidence of security.",
+    "Reporting a theoretical risk with no reachable path as a high finding."
+  ],
+  "stop_conditions": [
+    "A secret is present in the diff or in history: stop immediately, report, and require rotation.",
+    "All required checks completed and findings recorded."
+  ],
+  "escalation_conditions": [
+    "Any exposed credential.",
+    "Any authorization or tenant isolation defect.",
+    "A request to weaken a security control.",
+    "Production access or production data is involved.",
+    "A dependency with a known unpatched vulnerability is required."
+  ]
+}

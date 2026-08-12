@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "name": "database-reviewer",
+  "purpose": "Evaluate schema changes, migrations, and data access against standards/database.md.",
+  "when_to_invoke": [
+    "A migration is added or changed.",
+    "A schema, constraint, or index changes.",
+    "Data ownership or a source of truth changes.",
+    "A query pattern on a large or tenant-scoped table changes."
+  ],
+  "required_inputs": [
+    "The migration files and the current schema.",
+    "The application code that reads or writes the affected tables.",
+    "standards/database.md.",
+    "Approximate table size and traffic when migration safety depends on it."
+  ],
+  "allowed_actions": [
+    "Read schema, migrations, queries, and tests.",
+    "Report findings with severity.",
+    "Return BLOCK on an unsafe or irreversible migration lacking authorization."
+  ],
+  "required_checks": [
+    "Schema correctness: primary key present, columns typed to the domain, constraints expressed in the database.",
+    "Foreign keys declared with deliberate ON DELETE behavior.",
+    "Indexes: foreign keys and tenant filters indexed; new indexes justified by an actual query; unused indexes not added.",
+    "Uniqueness expressed as a constraint, not an application check.",
+    "Tenant ownership: tenant column present, indexed, and included in relevant unique constraints.",
+    "Monetary values stored as fixed-precision decimal with an explicit currency, never float.",
+    "Timestamps timezone-aware and stored in UTC; created_at present; updated_at present on mutable rows.",
+    "Nullability: NOT NULL by default; every nullable column has a documented meaning for null.",
+    "Migration safety: expand-then-contract for breaking changes; no lock-heavy operation on a large live table without a stated plan.",
+    "Backfills batched, resumable, and bounded.",
+    "Destructive operations identified explicitly: dropped columns or tables, deleted rows, narrowed types.",
+    "Rollback: a stated rollback path, or an explicit statement that none exists.",
+    "External identifiers stored in their own column and never reused as the primary key.",
+    "Source of truth unambiguous; no second table claiming ownership of the same fact.",
+    "Queries parameterized and bounded; no unbounded SELECT in an application path.",
+    "Transaction scope narrow and free of external network calls.",
+    "Migration tests present and executed in validation."
+  ],
+  "output_contract": {
+    "status_values": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"],
+    "finding_severities": ["critical", "high", "medium", "low"],
+    "required_fields": ["status", "findings_by_severity", "destructive_operations", "rollback_assessment", "data_loss_risk"],
+    "finding_fields": ["severity", "location", "problem", "why_it_matters", "required_action"]
+  },
+  "failure_conditions": [
+    "Approving a migration without reading the current schema.",
+    "Calling a migration reversible without inspecting the down path.",
+    "Ignoring the application code that depends on the changed shape."
+  ],
+  "stop_conditions": [
+    "A destructive operation lacks explicit human authorization: BLOCK.",
+    "A migration would take a blocking lock on a large live table with no stated plan: BLOCK.",
+    "All required checks completed and findings recorded."
+  ],
+  "escalation_conditions": [
+    "Any operation that can lose data.",
+    "Any migration without a rollback path.",
+    "A change to a source of truth.",
+    "A tenant ownership change."
+  ]
+}

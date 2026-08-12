@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evolium.dev/evo/schemas/validation-report.schema.json",
+  "title": "EVO validation report",
+  "description": "Deterministic result of evo validate. Every entry describes a command that actually executed, or is explicitly marked SKIPPED. Captured output is bounded and must never contain secrets.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project",
+    "evo_version",
+    "started_at",
+    "finished_at",
+    "duration_seconds",
+    "status",
+    "counts",
+    "validations"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "project": { "type": ["string", "null"] },
+    "evo_version": { "type": "string" },
+    "started_at": { "type": "string", "description": "UTC ISO 8601." },
+    "finished_at": { "type": "string", "description": "UTC ISO 8601." },
+    "duration_seconds": { "type": "number", "minimum": 0 },
+    "status": {
+      "enum": ["PASS", "WARN", "FAIL"],
+      "description": "FAIL if any required validation failed. WARN if only optional validations failed. PASS otherwise."
+    },
+    "fail_fast": { "type": "boolean" },
+    "counts": {
+      "type": "object",
+      "required": ["pass", "warn", "fail", "skipped"],
+      "properties": {
+        "pass": { "type": "integer", "minimum": 0 },
+        "warn": { "type": "integer", "minimum": 0 },
+        "fail": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "validations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "category",
+          "command",
+          "required",
+          "status",
+          "started_at",
+          "duration_seconds",
+          "exit_code",
+          "output",
+          "output_truncated",
+          "error"
+        ],
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "command": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "Argument array. Executed without a shell."
+          },
+          "required": { "type": "boolean" },
+          "status": {
+            "enum": ["PASS", "WARN", "FAIL", "SKIPPED"],
+            "description": "PASS on exit code 0. Otherwise FAIL when required, WARN when optional. SKIPPED means the command was not executed and nothing is claimed about it."
+          },
+          "started_at": { "type": ["string", "null"] },
+          "duration_seconds": { "type": ["number", "null"], "minimum": 0 },
+          "exit_code": { "type": ["integer", "null"] },
+          "output": {
+            "type": "string",
+            "description": "Bounded tail of combined stdout and stderr. Empty for PASS, where output carries no diagnostic value and would only enlarge the report."
+          },
+          "output_truncated": { "type": "boolean" },
+          "error": { "type": ["string", "null"], "description": "Executor-level failure such as a missing executable or a timeout." },
+          "skip_reason": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

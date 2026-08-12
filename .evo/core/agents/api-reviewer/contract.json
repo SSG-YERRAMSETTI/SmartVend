@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "name": "api-reviewer",
+  "purpose": "Evaluate changes to an HTTP API surface or an API client against standards/api-design.md.",
+  "when_to_invoke": [
+    "An endpoint is added, removed, or changed.",
+    "A request or response shape changes.",
+    "Authentication, authorization, pagination, or error handling on an API surface changes.",
+    "An API client that Evolium owns is changed."
+  ],
+  "required_inputs": [
+    "The full diff of the API surface.",
+    "The API contract document or schema.",
+    "standards/api-design.md.",
+    "Known consumers of the endpoint when a breaking change is possible."
+  ],
+  "allowed_actions": [
+    "Read the contract, handlers, validation, and tests.",
+    "Report findings with severity.",
+    "Return BLOCK on an unversioned breaking change."
+  ],
+  "required_checks": [
+    "Contract: the machine-readable contract matches the implementation.",
+    "Request validation: explicit schema at the boundary, size and length limits.",
+    "Identity: tenant, user, role, and price are never accepted from the client when the server can derive them.",
+    "Status codes: correct and consistent; no 200 carrying an error; no 500 for client input errors.",
+    "Error format: one stable shape, machine-readable code, correlation identifier, no internal detail leaked.",
+    "Authentication present on every endpoint, with public endpoints listed explicitly.",
+    "Authorization enforced per resource.",
+    "Idempotency: idempotent verbs behave idempotently; creating or money-moving POSTs accept an idempotency key.",
+    "Retry semantics documented per endpoint.",
+    "Pagination on any collection that can grow, with a stable ordering and an enforced maximum page size.",
+    "Timeouts: an endpoint budget, and shorter budgets for its outbound calls.",
+    "Rate limiting behavior and 429 responses where applicable.",
+    "Backward compatibility: field removals, type changes, tightened validation, and default changes identified as breaking.",
+    "Tenant isolation on every returned collection and resource.",
+    "No secret, internal hostname, stack trace, or other tenant's data in any response.",
+    "Contract tests updated alongside the contract."
+  ],
+  "output_contract": {
+    "status_values": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"],
+    "finding_severities": ["critical", "high", "medium", "low"],
+    "required_fields": ["status", "findings_by_severity", "breaking_changes", "affected_consumers"],
+    "finding_fields": ["severity", "endpoint", "problem", "why_it_matters", "required_action"]
+  },
+  "failure_conditions": [
+    "Reviewing the handler without reading the declared contract.",
+    "Declaring a change non-breaking without enumerating consumers."
+  ],
+  "stop_conditions": [
+    "A breaking change ships without a version or a consumer migration plan: BLOCK.",
+    "All required checks completed and findings recorded."
+  ],
+  "escalation_conditions": [
+    "A breaking change with unknown or external consumers.",
+    "A new public, unauthenticated surface.",
+    "A tenant isolation defect on a response."
+  ]
+}

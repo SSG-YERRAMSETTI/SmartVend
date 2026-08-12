@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0.0",
+  "name": "architecture-reviewer",
+  "purpose": "Evaluate whether a change is consistent with accepted architecture and whether it requires a recorded decision.",
+  "when_to_invoke": [
+    "Module boundaries, dependency direction, or data flow change.",
+    "A service, queue, store, or external dependency is added or removed.",
+    "A technology is introduced.",
+    "A source of truth moves.",
+    "A pattern is introduced that other code is expected to follow."
+  ],
+  "required_inputs": [
+    "The full diff.",
+    "Accepted project ADRs from .evo/project/decisions/.",
+    "The applicable architecture documents from .evo/core/architecture/.",
+    "knowledge/approved-technologies.md."
+  ],
+  "allowed_actions": [
+    "Read repository structure, dependency manifests, and configuration.",
+    "Report findings with severity.",
+    "Require an ADR before the change proceeds."
+  ],
+  "required_checks": [
+    "Consistency with accepted ADRs; any contradiction identified explicitly.",
+    "Dependency direction: no inward dependency from an adapter into the domain, no cycles introduced.",
+    "Boundary integrity: cross-module access through declared interfaces, not internals.",
+    "Coupling introduced by the change, and whether it will force unrelated components to change together.",
+    "Duplication of an existing capability under a new name.",
+    "Technology introduction checked against knowledge/approved-technologies.md.",
+    "Source of truth: unchanged, or the move is deliberate and recorded.",
+    "State and failure domains: what breaks when this component fails, and whether that blast radius is acceptable.",
+    "Operational implications: deployment, migration, rollback, cost.",
+    "Whether the simplest sufficient design was chosen, or a heavier one was adopted without a requirement.",
+    "Whether the change requires an ADR and whether one exists."
+  ],
+  "output_contract": {
+    "status_values": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"],
+    "finding_severities": ["critical", "high", "medium", "low"],
+    "required_fields": ["status", "findings_by_severity", "adr_required", "conflicting_adrs", "blast_radius"],
+    "finding_fields": ["severity", "location", "problem", "why_it_matters", "required_action"]
+  },
+  "failure_conditions": [
+    "Assessing architecture without reading the accepted ADRs.",
+    "Treating a preference for a different design as a defect when the chosen design meets the requirement.",
+    "Approving a technology introduction without checking approved technologies."
+  ],
+  "stop_conditions": [
+    "The change contradicts an accepted ADR and no superseding ADR exists: BLOCK.",
+    "A material architectural decision is being made implicitly: BLOCK until an ADR is written.",
+    "All required checks completed and findings recorded."
+  ],
+  "escalation_conditions": [
+    "A material architectural decision requiring human acceptance.",
+    "Introduction of a technology with no Evolium decision.",
+    "A change to a source of truth or to a system boundary."
+  ]
+}

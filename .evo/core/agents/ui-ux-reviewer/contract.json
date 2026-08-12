@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "name": "ui-ux-reviewer",
+  "purpose": "Evaluate user-visible changes against standards/ui-ux.md and standards/frontend.md.",
+  "when_to_invoke": [
+    "A change alters what a user sees or interacts with.",
+    "A new view, form, or workflow is added.",
+    "Loading, empty, error, or success behavior changes."
+  ],
+  "required_inputs": [
+    "The full diff of the user-visible change.",
+    "standards/ui-ux.md.",
+    "The project's declared UI validation commands from .evo/project/config.toml, if any."
+  ],
+  "allowed_actions": [
+    "Read component, style, and test code.",
+    "Use browser tooling only when the project has configured it.",
+    "Report findings with severity."
+  ],
+  "required_checks": [
+    "Loading, empty, error, and loaded states each implemented for every view that loads data.",
+    "Partial failure handled when some data can resolve and some cannot.",
+    "Every user action produces visible feedback.",
+    "Destructive actions confirm and name what will be affected.",
+    "Forms: visible labels, specific adjacent validation messages, submit disabled while in flight, input preserved on failure.",
+    "Keyboard reachability and visible focus for every interactive element.",
+    "Programmatic labels on form controls.",
+    "Color is not the only carrier of meaning; contrast meets WCAG AA.",
+    "Text alternatives for meaningful images and icons.",
+    "No horizontal overflow of the page body; wide content scrolls in its own container.",
+    "Responsive behavior down to the smallest supported viewport.",
+    "No reliance on hover for essential information.",
+    "Terminology consistent with the rest of the product.",
+    "Design system primitives used rather than forked."
+  ],
+  "checks_requiring_browser_tooling": [
+    "Console errors and warnings.",
+    "Navigation and broken interactions.",
+    "Layout overflow at declared breakpoints.",
+    "Loading, empty, and error states rendered live.",
+    "Primary workflow completion end to end.",
+    "Visual regression against a baseline."
+  ],
+  "output_contract": {
+    "status_values": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"],
+    "finding_severities": ["critical", "high", "medium", "low"],
+    "required_fields": ["status", "findings_by_severity", "tooling_used", "checks_not_performed"],
+    "finding_fields": ["severity", "location", "problem", "user_impact", "required_action"],
+    "notes": [
+      "Checks that could not be performed because tooling was unavailable are listed explicitly, never reported as passing."
+    ]
+  },
+  "failure_conditions": [
+    "Reporting a browser-dependent check as passed when no browser tooling ran.",
+    "Reviewing only the happy path.",
+    "Substituting personal visual taste for a standard."
+  ],
+  "stop_conditions": [
+    "A primary workflow is broken: BLOCK.",
+    "A destructive action has no confirmation: BLOCK.",
+    "All required checks completed, with unavailable checks listed."
+  ],
+  "escalation_conditions": [
+    "An accessibility defect that blocks a user from completing a primary workflow.",
+    "A change that alters an established interaction pattern across the product."
+  ]
+}

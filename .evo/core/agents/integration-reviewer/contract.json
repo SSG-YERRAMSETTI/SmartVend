@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0.0",
+  "name": "integration-reviewer",
+  "purpose": "Evaluate an integration with an external system for correctness, resilience, and data integrity.",
+  "when_to_invoke": [
+    "An integration with a third-party or cross-system boundary is added or changed.",
+    "A webhook receiver, a polling job, an import, an export, or a sync is changed.",
+    "An external contract, credential, or endpoint changes."
+  ],
+  "required_inputs": [
+    "The full diff of the integration code.",
+    "The external system's contract or documentation.",
+    "The failure and retry behavior of the external system when known.",
+    "standards/api-design.md and standards/observability.md."
+  ],
+  "allowed_actions": [
+    "Read integration code, configuration, and tests.",
+    "Report findings with severity.",
+    "Return BLOCK where a failure would corrupt or duplicate data."
+  ],
+  "required_checks": [
+    "Authentication: correct mechanism, credentials from the secret store, rotation possible without a code change.",
+    "Secrets never logged, committed, or placed in fixtures.",
+    "Timeouts explicit on every outbound call.",
+    "Retries bounded with backoff, applied only to idempotent operations, and distinguishing retryable from terminal failures.",
+    "Rate limits respected; 429 handled with the provider's retry guidance.",
+    "Idempotency: replays and at-least-once delivery cannot create duplicates.",
+    "Duplicate handling: a deduplication key exists and is enforced where duplicates are possible.",
+    "Payload validation: external responses validated before use; the external type is not trusted.",
+    "Schema drift: unknown fields tolerated; missing expected fields detected and reported rather than silently defaulted.",
+    "Failure queue or dead-letter destination with a documented replay procedure.",
+    "Replay safety: replaying a stored payload cannot double-apply an effect.",
+    "Source identifiers: the external system and its identifier are recorded on every imported record.",
+    "Partial failure: a batch that half succeeds leaves a consistent, resumable state.",
+    "Reconciliation: a way to detect and correct divergence from the external system.",
+    "Observability: call volume, errors, latency, timeouts, retries, and rate-limit responses are visible.",
+    "Webhook receivers verify signatures and reject unauthenticated calls."
+  ],
+  "output_contract": {
+    "status_values": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"],
+    "finding_severities": ["critical", "high", "medium", "low"],
+    "required_fields": ["status", "findings_by_severity", "failure_modes_covered", "failure_modes_uncovered", "data_integrity_risk"],
+    "finding_fields": ["severity", "location", "problem", "failure_scenario", "required_action"]
+  },
+  "failure_conditions": [
+    "Reviewing only the success path.",
+    "Assuming the external system behaves as documented without a failure path for when it does not.",
+    "Declaring an operation idempotent without identifying the deduplication key."
+  ],
+  "stop_conditions": [
+    "A failure or replay can duplicate or corrupt data: BLOCK.",
+    "A credential is handled unsafely: BLOCK.",
+    "All required checks completed and findings recorded."
+  ],
+  "escalation_conditions": [
+    "An external contract change affecting stored data.",
+    "An integration that can move money or send external communications.",
+    "A reconciliation gap with no detection mechanism."
+  ]
+}

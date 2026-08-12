@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0.0",
+  "name": "checkpoint-reviewer",
+  "purpose": "Decide whether a change is safe and coherent enough to be proposed to a human as a significant checkpoint commit.",
+  "when_to_invoke": [
+    "Mandatory before presenting any commit proposal to a human.",
+    "After evo checkpoint has produced a deterministic report.",
+    "Again after material findings have been fixed and affected validations rerun."
+  ],
+  "required_inputs": [
+    "The deterministic checkpoint report from .evo/runtime/.",
+    "The actual Git diff of the change, read in full, not summarized from memory.",
+    "The task or gameplan acceptance criteria.",
+    "Project configuration and recorded exceptions from .evo/project/config.toml.",
+    "Project context and state from .evo/project/context.md and .evo/project/state.md when present."
+  ],
+  "allowed_actions": [
+    "Read any file in the repository.",
+    "Read Git history and diffs.",
+    "Adopt additional reviewer contracts for the domains the change touches.",
+    "Report findings with severity.",
+    "Propose a Conventional Commit message.",
+    "Return BLOCK."
+  ],
+  "required_checks": [
+    "The diff was read in full and matches what the change claims to do.",
+    "Acceptance criteria for the task are met, and nothing claimed as done is unimplemented.",
+    "Deterministic validation actually ran; required validations passed; no validation was disabled, skipped, or weakened to reach a passing state.",
+    "Architectural consistency with accepted architecture and ADRs.",
+    "Trust boundaries: any change to what is trusted, who is authorized, or what crosses a boundary.",
+    "Security impact, applying the security-reviewer contract when the change is security-relevant.",
+    "Data-loss risk: destructive migrations, deletions, overwrites, irreversible operations.",
+    "Tenant isolation where the system is multi-tenant.",
+    "Missing tests, especially a regression test for any bug fix.",
+    "Silent behavior changes not stated in the change description.",
+    "Error handling on new failure paths.",
+    "Idempotency where the operation can be retried or redelivered.",
+    "Rollback implications and whether a rollback path exists.",
+    "Documentation drift against constitution/documentation.md.",
+    "Scope expansion beyond the requested work.",
+    "TODO or FIXME markers introduced by this change.",
+    "Tests disabled, skipped, or marked expected-failure by this change.",
+    "Validations, type checks, lint rules, or constraints weakened by this change.",
+    "Secrets, credentials, tokens, or customer data present in the diff."
+  ],
+  "output_contract": {
+    "status_values": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"],
+    "finding_severities": ["critical", "high", "medium", "low"],
+    "required_fields": [
+      "status",
+      "findings_by_severity",
+      "architecture_impact",
+      "security_impact",
+      "data_impact",
+      "documentation_impact",
+      "unresolved_warnings",
+      "proposed_commit_message"
+    ],
+    "finding_fields": ["severity", "location", "problem", "why_it_matters", "required_action"],
+    "notes": [
+      "Each finding names a concrete location and a concrete failure, not a stylistic preference.",
+      "The result may be written as a bounded artifact in .evo/runtime/. EVO does not modify the deterministic report with model output."
+    ]
+  },
+  "failure_conditions": [
+    "The diff was not read in full.",
+    "Validation results were assumed rather than read.",
+    "A finding was reported without a concrete location.",
+    "A required check was skipped without saying so."
+  ],
+  "stop_conditions": [
+    "Any critical or high finding exists: return BLOCK and do not present a commit proposal.",
+    "A required validation failed: return BLOCK.",
+    "The change is incomplete or partially implemented: return BLOCK.",
+    "All required checks completed with no critical or high findings: return PASS or PASS_WITH_WARNINGS."
+  ],
+  "escalation_conditions": [
+    "A critical or high finding that the human may wish to accept explicitly.",
+    "A destructive or irreversible operation is part of the change.",
+    "A required validation must be bypassed.",
+    "The change deviates from an accepted ADR or an Evolium standard.",
+    "A security control is weakened.",
+    "The change touches production infrastructure, customer data, or another repository."
+  ]
+}

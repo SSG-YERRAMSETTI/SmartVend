@@ -40,3 +40,8 @@ __pycache__/
 backend/uploads/
 backend/uploads_searchable/
 backend/debug_receipts/
+
+# Provider extraction output. Contains real customer business data and must
+# never reach this repository, which is public.
+data/vendsoft/raw/
+data/vendsoft/reports/

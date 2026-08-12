@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evolium.dev/evo/schemas/agent-contract.schema.json",
+  "title": "EVO agent contract",
+  "description": "A reusable engineering review role. EVO v0.1 runs no agent processes; the active model adopts the role by reading this contract.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "purpose",
+    "when_to_invoke",
+    "required_inputs",
+    "allowed_actions",
+    "required_checks",
+    "output_contract",
+    "failure_conditions",
+    "stop_conditions",
+    "escalation_conditions"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "name": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "purpose": { "type": "string", "minLength": 1 },
+    "when_to_invoke": { "$ref": "#/$defs/stringList" },
+    "required_inputs": { "$ref": "#/$defs/stringList" },
+    "allowed_actions": { "$ref": "#/$defs/stringList" },
+    "required_checks": { "$ref": "#/$defs/stringList" },
+    "checks_requiring_browser_tooling": { "$ref": "#/$defs/stringList" },
+    "output_contract": {
+      "type": "object",
+      "required": ["status_values", "finding_severities", "required_fields"],
+      "properties": {
+        "status_values": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"] }
+        },
+        "finding_severities": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["critical", "high", "medium", "low"] }
+        },
+        "required_fields": { "$ref": "#/$defs/stringList" },
+        "finding_fields": { "$ref": "#/$defs/stringList" },
+        "notes": { "$ref": "#/$defs/stringList" }
+      },
+      "additionalProperties": false
+    },
+    "failure_conditions": { "$ref": "#/$defs/stringList" },
+    "stop_conditions": { "$ref": "#/$defs/stringList" },
+    "escalation_conditions": { "$ref": "#/$defs/stringList" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

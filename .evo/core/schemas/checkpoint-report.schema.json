@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evolium.dev/evo/schemas/checkpoint-report.schema.json",
+  "title": "EVO checkpoint report",
+  "description": "Deterministic portion of a significant checkpoint, produced by evo checkpoint. EVO does not call any model and does not populate the review section. The active model performs the reviewer role separately and may write its own bounded artifact.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project",
+    "evo_version",
+    "generated_at",
+    "git",
+    "changed_files",
+    "sensitive_paths",
+    "validation",
+    "review_state",
+    "review"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "project": { "type": ["string", "null"] },
+    "evo_version": { "type": "string" },
+    "generated_at": { "type": "string", "description": "UTC ISO 8601." },
+    "git": {
+      "type": "object",
+      "required": ["available", "is_repository", "branch", "head_commit", "has_uncommitted_changes", "status_lines"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "is_repository": { "type": "boolean" },
+        "branch": { "type": ["string", "null"] },
+        "head_commit": { "type": ["string", "null"] },
+        "has_uncommitted_changes": { "type": "boolean" },
+        "status_lines": { "type": "array", "items": { "type": "string" } },
+        "status_truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "status"],
+        "properties": {
+          "path": { "type": "string", "description": "Repository-relative, forward slashes." },
+          "status": { "type": "string", "description": "Git short status code, or '??' for untracked." }
+        },
+        "additionalProperties": false
+      }
+    },
+    "changed_files_truncated": { "type": "boolean" },
+    "sensitive_paths": {
+      "type": "object",
+      "required": ["architecture", "security", "documentation"],
+      "properties": {
+        "architecture": { "type": "array", "items": { "type": "string" } },
+        "security": { "type": "array", "items": { "type": "string" } },
+        "documentation": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "validation": {
+      "description": "Embedded validation report, or null when validation was not run.",
+      "type": ["object", "null"]
+    },
+    "review_state": {
+      "enum": ["PENDING_MODEL_REVIEW", "MODEL_REVIEWED", "HUMAN_APPROVED"],
+      "description": "evo checkpoint always writes PENDING_MODEL_REVIEW. Later states are set only by a deliberate action, never inferred."
+    },
+    "review": {
+      "description": "Null in the deterministic report. A model review result may be recorded here or in a separate bounded artifact.",
+      "type": ["object", "null"],
+      "properties": {
+        "status": { "enum": ["PASS", "PASS_WITH_WARNINGS", "BLOCK"] },
+        "critical": { "type": "array", "items": { "type": "string" } },
+        "high": { "type": "array", "items": { "type": "string" } },
+        "medium": { "type": "array", "items": { "type": "string" } },
+        "low": { "type": "array", "items": { "type": "string" } },
+        "architecture_impact": { "type": "string" },
+        "security_impact": { "type": "string" },
+        "data_impact": { "type": "string" },
+        "documentation_impact": { "type": "string" },
+        "unresolved_warnings": { "type": "array", "items": { "type": "string" } },
+        "proposed_commit_message": { "type": "string" },
+        "reviewed_by": { "type": "string", "description": "Identifier of the model or human that performed the review." },
+        "reviewed_at": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}
