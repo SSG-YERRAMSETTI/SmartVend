@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local secrets and VendSoft API output
+# Root-anchored so it matches only ./.env, never .env.example or nested files.
+/.env
+backend/.env
+data/vendsoft/raw/
+data/vendsoft/reports/
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/

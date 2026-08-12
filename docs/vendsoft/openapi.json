@@ -1,0 +1,1281 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "version": "2.0.0",
+    "title": "VendSoft API",
+    "contact": {
+      "url": "https://www.vendsoft.com/"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "x-logo": {
+      "url": "https://www.vendsoft.com/img/logo_VendSoft-250pix.png"
+    },
+    "description": "# Introduction\n"
+  },
+  "tags": [
+    {
+      "name": "Product",
+      "description": "Operations about products."
+    },
+    {
+      "name": "Machine",
+      "description": "Operations about machines."
+    },
+    {
+      "name": "Planogram",
+      "description": "Operations about machine planograms."
+    },
+    {
+      "name": "Refill",
+      "description": "Operations about refilling machines."
+    },
+    {
+      "name": "Location",
+      "description": "Operations about locations."
+    },
+    {
+      "name": "Purchase",
+      "description": "Operations about purchases."
+    },
+    {
+      "name": "Trip",
+      "description": "Operations about trips."
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://secure.vendsoft.com/api/v2"
+    }
+  ],
+  "paths": {
+    "/products": {
+      "get": {
+        "tags": [
+          "Product"
+        ],
+        "description": "Returns a list of products",
+        "summary": "Get list of products",
+        "operationId": "getProducts",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully returned a list of products",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Product"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Product"
+        ],
+        "summary": "Create a new product",
+        "description": "Operation description **Markdown**.\n",
+        "operationId": "createProduct",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Product"
+              }
+            }
+          },
+          "description": "requestBody description",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/products/{productCode}": {
+      "put": {
+        "tags": [
+          "Product"
+        ],
+        "summary": "Update product",
+        "description": "This can only be done by the logged in user.",
+        "operationId": "updateProduct",
+        "parameters": [
+          {
+            "name": "productCode",
+            "in": "path",
+            "description": "The code of the product that needs to be updated",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Product"
+              }
+            }
+          },
+          "description": "Updated product object",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      }
+    },
+    "/machines": {
+      "get": {
+        "tags": [
+          "Machine"
+        ],
+        "description": "Returns a list of machines",
+        "summary": "Get list of machines",
+        "operationId": "getMachines",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully returned a list of machines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Machine"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Machine"
+        ],
+        "summary": "Create a new machine",
+        "description": "Operation description **Markdown**.\n",
+        "operationId": "createMachine",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Machine"
+              }
+            }
+          },
+          "description": "requestBody description",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Machine"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Machine"
+        ],
+        "summary": "Update machine",
+        "description": "This can only be done by the logged in user.",
+        "operationId": "updateMachine",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Machine"
+              }
+            }
+          },
+          "description": "Updated machine object",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Machine"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid machine supplied"
+          },
+          "404": {
+            "description": "Machine not found"
+          }
+        }
+      }
+    },
+    "/machines/{machineCode}/planogram": {
+      "get": {
+        "tags": [
+          "Planogram"
+        ],
+        "summary": "Get planogram",
+        "description": "This can only be done by the logged in user.",
+        "operationId": "getMachinePlanogram",
+        "parameters": [
+          {
+            "name": "machineCode",
+            "in": "path",
+            "description": "The code of the machine",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Column"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Planogram"
+        ],
+        "summary": "Create or update planogram",
+        "description": "This can only be done by the logged in user.",
+        "operationId": "createMachinePlanogram",
+        "parameters": [
+          {
+            "name": "machineCode",
+            "in": "path",
+            "description": "The code of the machine that needs to be updated",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Column"
+                }
+              }
+            }
+          },
+          "description": "Updated machine object",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/machines/{machineCode}/refill": {
+      "post": {
+        "tags": [
+          "Refill"
+        ],
+        "summary": "Refill machine",
+        "description": "This can only be done by the logged in user.",
+        "operationId": "refillMachine",
+        "parameters": [
+          {
+            "name": "machineCode",
+            "in": "path",
+            "description": "The code of the machine that needs to be updated",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefillMachine"
+              }
+            }
+          },
+          "description": "Refill object",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/machines/{machineCode}/sales": {
+      "get": {
+        "tags": [
+          "Machine"
+        ],
+        "summary": "Get telemetry sales",
+        "description": "Get sales transactions from telemetry data for a specific machine.",
+        "operationId": "getMachineSales",
+        "parameters": [
+          {
+            "name": "machineCode",
+            "in": "path",
+            "description": "The code of the machine",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "description": "Start date in format yyyyMMddHHmmss",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{14}$",
+              "example": "20250610000000"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "description": "End date in format yyyyMMddHHmmss",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{14}$",
+              "example": "20250610235959"
+            }
+          }
+        ],
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TelemetrySale"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "404": {
+            "description": "Machine not found"
+          }
+        }
+      }
+    },
+    "/locations": {
+      "get": {
+        "tags": [
+          "Location"
+        ],
+        "description": "Returns a list of locations",
+        "summary": "Get list of locations",
+        "operationId": "getLocations",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully returned a list of locations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Location"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips": {
+      "post": {
+        "tags": [
+          "Trip"
+        ],
+        "summary": "Create a new trip",
+        "description": "Creates a trip in `Created` status for an existing driver and a list of machines.\n\nAt least one of `driverEmail` or `driverUsername` must be provided, and the driver must already exist for the authenticated customer.\n",
+        "operationId": "createTrip",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTrip"
+              }
+            }
+          },
+          "description": "Create trip request",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Trip created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTripResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/purchases": {
+      "post": {
+        "tags": [
+          "Purchase"
+        ],
+        "summary": "Create a new purchase",
+        "description": "Operation description **Markdown**.\n",
+        "operationId": "createPurchase",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Purchase"
+              }
+            }
+          },
+          "description": "requestBody description",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Purchase"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/tickets": {
+      "post": {
+        "tags": [
+          "Ticket"
+        ],
+        "summary": "Create a new ticket",
+        "description": "Operation description **Markdown**.\n",
+        "operationId": "createTicket",
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "basic_auth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ticket"
+              }
+            }
+          },
+          "description": "requestBody description",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      },
+      "basic_auth": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    },
+    "schemas": {
+      "Product": {
+        "type": "object",
+        "properties": {
+          "productCode": {
+            "description": "Product SKU (should be unique)",
+            "type": "string",
+            "minLength": 1,
+            "example": "COKE01"
+          },
+          "productName": {
+            "description": "Product name",
+            "type": "string",
+            "minLength": 1,
+            "example": "Coca Cola Can"
+          },
+          "productType": {
+            "description": "Product type (category)",
+            "type": "string",
+            "minLength": 1,
+            "example": "Cold Drinks"
+          },
+          "barcode": {
+            "description": "Barcode",
+            "type": "string",
+            "example": "5449000000996"
+          },
+          "unitsPerCase": {
+            "description": "Number of items in a case / box",
+            "type": "integer",
+            "example": 24
+          },
+          "lastCost": {
+            "description": "Last cost",
+            "type": "number",
+            "format": "double"
+          },
+          "averageCost": {
+            "description": "Average cost",
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "additionalProperties": true,
+        "minProperties": 1,
+        "description": "The Problem Details JSON Object [[RFC7807](https://tools.ietf.org/html/rfc7807)].",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URI reference [[RFC3986](https://tools.ietf.org/html/rfc3986)] that identifies the problem type. It should provide human-readable documentation for the problem type. When this member is not present, its value is assumed to be \"about:blank\".",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "description": "A short, human-readable summary of the problem type. It SHOULD NOT change from occurrence to occurrence of the problem, except for purposes of localization."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code.",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string",
+            "description": "A human-readable explanation specific to this occurrence of the problem."
+          },
+          "instance": {
+            "type": "string",
+            "description": "A URI reference that identifies the specific occurrence of the problem.  It may or may not yield further information if dereferenced."
+          }
+        }
+      },
+      "Machine": {
+        "type": "object",
+        "properties": {
+          "machineCode": {
+            "description": "Machine code (should be unique)",
+            "type": "string",
+            "minLength": 1,
+            "example": "CD001"
+          },
+          "machineName": {
+            "description": "Machine name",
+            "type": "string",
+            "minLength": 1,
+            "example": "Soda machine first floor"
+          },
+          "machineType": {
+            "description": "Machine type",
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "Soda",
+              "Snack",
+              "Coffee",
+              "Soda/Snack",
+              "Snack/Coffee"
+            ]
+          },
+          "machineModel": {
+            "description": "Machine model",
+            "type": "string",
+            "example": "Dixie Narco"
+          },
+          "locationName": {
+            "description": "Location name",
+            "type": "string"
+          }
+        }
+      },
+      "Column": {
+        "type": "object",
+        "properties": {
+          "column": {
+            "description": "The item selection (should be unique)",
+            "type": "string",
+            "minLength": 1,
+            "example": "A1"
+          },
+          "columnType": {
+            "description": "The type of the column",
+            "type": "string",
+            "enum": [
+              "soda",
+              "drink",
+              "ingredient"
+            ]
+          },
+          "productCode": {
+            "description": "Product SKU (should be unique)",
+            "type": "string",
+            "minLength": 1,
+            "example": "COKE01"
+          },
+          "productName": {
+            "description": "Product name",
+            "type": "string",
+            "minLength": 1,
+            "example": "Coca Cola Can"
+          },
+          "productType": {
+            "description": "Product type (category)",
+            "type": "string",
+            "minLength": 1,
+            "example": "Cold Drinks"
+          },
+          "vendPrice": {
+            "description": "Vend price",
+            "type": "number",
+            "format": "double"
+          },
+          "maxCapacity": {
+            "description": "Capacity of the column",
+            "type": "integer"
+          },
+          "lastCount": {
+            "description": "The last fill level (for soda columns)",
+            "type": "integer"
+          }
+        }
+      },
+      "RefillColumn": {
+        "type": "object",
+        "properties": {
+          "column": {
+            "description": "The item selection (should be unique)",
+            "type": "string",
+            "minLength": 1,
+            "example": "A1"
+          },
+          "newProductCode": {
+            "description": "The code of the new product (when replacing products, optional)",
+            "type": "string"
+          },
+          "newPrice": {
+            "description": "New price (when changing price, optional)",
+            "type": "number",
+            "format": "double"
+          },
+          "newCount": {
+            "description": "The quantity after the refilling",
+            "type": "integer"
+          }
+        }
+      },
+      "RefillMachine": {
+        "type": "object",
+        "properties": {
+          "refillTime": {
+            "description": "Timestamp of the refill",
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-07-12 07:20:50"
+          },
+          "driverEmail": {
+            "description": "The email of the driver",
+            "type": "string"
+          },
+          "driverUsername": {
+            "description": "The username of the driver",
+            "type": "string"
+          },
+          "cashCollected": {
+            "description": "A flag showing whether the cash has been collected during the visit",
+            "type": "boolean"
+          },
+          "cashCollectedAmount": {
+            "description": "The cash collected from the machine",
+            "type": "number",
+            "format": "double"
+          },
+          "columns": {
+            "description": "The item selection (should be unique)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefillColumn"
+            }
+          }
+        }
+      },
+      "TelemetrySale": {
+        "type": "object",
+        "properties": {
+          "telemetryId": {
+            "type": "string",
+            "description": "Telemetry identifier",
+            "example": "VK12345"
+          },
+          "transactionId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unique transaction identifier",
+            "example": 126290169
+          },
+          "transactionTime": {
+            "type": "string",
+            "description": "Transaction timestamp in format yyyyMMddHHmmss",
+            "pattern": "^\\d{14}$",
+            "example": "20250610225908"
+          },
+          "productName": {
+            "type": "string",
+            "description": "Name of the product sold",
+            "example": "Coca Cola Can"
+          },
+          "machineCode": {
+            "type": "string",
+            "description": "Machine code",
+            "example": "CD001"
+          },
+          "productCode": {
+            "type": "string",
+            "description": "Product code",
+            "example": "COKE01"
+          },
+          "creditCard": {
+            "type": "string",
+            "description": "Masked credit card number",
+            "example": "*1234"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Quantity sold",
+            "example": 1
+          },
+          "selection": {
+            "type": "string",
+            "description": "Vending machine selection",
+            "example": "62"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "description": "Sale price",
+            "example": 1.2
+          },
+          "machineName": {
+            "type": "string",
+            "description": "Machine name",
+            "example": "Cold drink 1"
+          }
+        },
+        "required": [
+          "telemetryId",
+          "transactionId",
+          "transactionTime",
+          "machineCode",
+          "quantity",
+          "price"
+        ]
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "locationCode": {
+            "description": "Location code (should be unique)",
+            "type": "string",
+            "minLength": 1,
+            "example": "L001"
+          },
+          "locationName": {
+            "description": "Location name",
+            "type": "string",
+            "minLength": 1,
+            "example": "Casa Estates"
+          },
+          "addressLine1": {
+            "description": "Address Line1",
+            "type": "string"
+          },
+          "addressLine2": {
+            "description": "Address Line2",
+            "type": "string"
+          },
+          "city": {
+            "description": "City",
+            "type": "string"
+          },
+          "region": {
+            "description": "State/Province",
+            "type": "string"
+          },
+          "zipCode": {
+            "description": "ZIP code",
+            "type": "string"
+          }
+        }
+      },
+      "CreateTrip": {
+        "type": "object",
+        "required": [
+          "delivery_date",
+          "machineCodes"
+        ],
+        "properties": {
+          "delivery_date": {
+            "description": "Preferred delivery date field. The API also accepts `deliveryDate`. Supported formats are `yyyy-MM-dd`, `yyyy-MM-dd HH:mm:ss`, `yyyy-MM-dd'T'HH:mm:ss`, and `yyyy-MM-dd'T'HH:mm:ssZ`.",
+            "type": "string",
+            "example": "2026-04-06",
+            "minLength": 1
+          },
+          "driverEmail": {
+            "description": "Email of an existing driver for this customer.",
+            "type": "string",
+            "format": "email",
+            "example": "driver@example.com"
+          },
+          "driverUsername": {
+            "description": "Username of an existing driver for this customer.",
+            "type": "string",
+            "example": "jdoe"
+          },
+          "description": {
+            "description": "Optional trip description.",
+            "type": "string",
+            "example": "Tuesday downtown route"
+          },
+          "machineCodes": {
+            "description": "Preferred machine code array field. The API also accepts `machine_codes`.",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "M-1001",
+              "M-1002"
+            ]
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "driverEmail"
+            ]
+          },
+          {
+            "required": [
+              "driverUsername"
+            ]
+          }
+        ],
+        "example": {
+          "delivery_date": "2026-04-06",
+          "driverEmail": "driver@example.com",
+          "description": "Tuesday downtown route",
+          "machineCodes": [
+            "M-1001",
+            "M-1002"
+          ]
+        }
+      },
+      "CreateTripResponse": {
+        "type": "object",
+        "required": [
+          "tripNumber"
+        ],
+        "properties": {
+          "tripNumber": {
+            "description": "Numeric identifier of the created trip.",
+            "type": "integer",
+            "example": 12345
+          }
+        }
+      },
+      "PurchaseLineItem": {
+        "type": "object",
+        "properties": {
+          "productCode": {
+            "description": "Product SKU (should be unique)",
+            "type": "string",
+            "minLength": 1,
+            "example": "COKE01"
+          },
+          "productName": {
+            "description": "Product name",
+            "type": "string",
+            "minLength": 1,
+            "example": "Coca Cola Can"
+          },
+          "productType": {
+            "description": "Product type (category)",
+            "type": "string",
+            "minLength": 1,
+            "example": "Cold Drinks"
+          },
+          "numberCases": {
+            "description": "Number of cases",
+            "type": "integer"
+          },
+          "costPerCase": {
+            "description": "Cost per case",
+            "type": "number",
+            "format": "double"
+          },
+          "unitsPerCase": {
+            "description": "Units per case",
+            "type": "integer"
+          },
+          "numberUnits": {
+            "description": "Number of units",
+            "type": "integer"
+          },
+          "unitCost": {
+            "description": "Unit cost",
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "Purchase": {
+        "type": "object",
+        "properties": {
+          "purchaseDate": {
+            "description": "Date of the purchase",
+            "type": "string",
+            "format": "date",
+            "example": "2023-07-12",
+            "minLength": 1
+          },
+          "supplierName": {
+            "description": "Name of the supplier",
+            "type": "string",
+            "minLength": 1
+          },
+          "invoiceNumber": {
+            "description": "Invoice number",
+            "type": "string",
+            "minLength": 1
+          },
+          "shippingCost": {
+            "description": "Shipping Cost",
+            "type": "number",
+            "format": "double"
+          },
+          "salesTax": {
+            "description": "Sales Tax",
+            "type": "number",
+            "format": "double"
+          },
+          "lineItems": {
+            "description": "Purchase line items",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseLineItem"
+            }
+          }
+        }
+      },
+      "Ticket": {
+        "type": "object",
+        "properties": {
+          "machineCode": {
+            "description": "Machine Code",
+            "type": "string",
+            "minLength": 1,
+            "example": "CD001"
+          },
+          "problemType": {
+            "description": "Problem Type",
+            "type": "string",
+            "minLength": 1,
+            "example": "Refund/Machine Broken/Restock Required/Product Request/Other"
+          },
+          "description": {
+            "description": "Description",
+            "type": "string"
+          },
+          "clientEmail": {
+            "description": "Client Email",
+            "type": "string"
+          },
+          "clientPhone": {
+            "description": "Client Phone",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Problem": {
+        "description": "Problem",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    }
+  }
+}
