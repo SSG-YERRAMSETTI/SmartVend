@@ -1,0 +1,12 @@
+# Backend development and test dependencies.
+#
+# Separate from requirements.txt, which carries runtime dependencies only.
+# Installing these is a precondition for running `python -m pytest backend/tests`.
+#
+# The backend has no committed virtualenv. Create one, or install into the
+# interpreter you run tests with.
+
+pytest==9.1.1
+
+# FastAPI's TestClient requires httpx.
+httpx==0.28.1

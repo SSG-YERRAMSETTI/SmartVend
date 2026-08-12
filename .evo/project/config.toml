@@ -37,6 +37,16 @@ authoritative = [
 # Frontend commands require `npm ci` to have been run; node_modules is not
 # committed. That is an environment precondition, not a project defect.
 
+# Backend tests. Added in the Seed Live milestone, which established the first
+# backend test surface. Requires backend/requirements-dev.txt to be installed,
+# plus SQLAlchemy from requirements.txt. Touches no database and no network.
+[[validation]]
+name = "backend-tests"
+category = "unit"
+command = ["python", "-m", "pytest", "backend/tests", "-q"]
+required = true
+timeout_seconds = 600
+
 [[validation]]
 name = "frontend-typecheck"
 category = "type"
@@ -65,9 +75,11 @@ timeout_seconds = 600
 
 # Known validation gaps, recorded rather than faked. See state.md.
 #
-# backend-tests      no test files exist anywhere on main
-# backend-import     backend cannot import: sqlalchemy, alembic, passlib and jwt
-#                    are not installed, and no virtualenv is committed
+# backend-import     the application cannot be imported without DATABASE_URL and
+#                    JWT_SECRET, because db.py and auth.py raise at import time.
+#                    There is no backend/.env.example documenting them. The
+#                    integrations package is deliberately free of that coupling
+#                    and imports with no configuration at all.
 # backend-lint       no linter or type checker is configured for Python
 # migration-check    Alembic is declared in requirements.txt but never
 #                    initialized; there is nothing to check
