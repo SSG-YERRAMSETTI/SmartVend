@@ -39,6 +39,83 @@ Observed in the Seed Live product.
   - further configurable reports
 - **Delivery is live only.** Once configured, a transport sends **new** data.
   It is not a historical backfill mechanism.
+- Reports can also be built and retrieved interactively through **Build a
+  Report -> Simple Report**, and historical files retrieved through **Report
+  Register -> Sent Reports -> File Name**. These are separate from transport
+  delivery and are how discovery evidence has been obtained so far.
+- **The account holds real transaction history, in September 2025.** See
+  section 10A.
+
+## 1A. Test Transport session, 2026-08-12 and 2026-08-13
+
+Six genuine Seed Live deliveries were captured through a temporary Cloudflare
+tunnel into a standalone capture harness. Raw evidence is held locally under
+`data/seedlive/`, which is gitignored and must never be committed.
+
+Genuine Seed Live traffic is identifiable by three corroborating signals:
+User-Agent `Apache-HttpClient/4.5.14 (Java/17.0.19)`, New Relic and W3C
+trace-context headers, and the appended `testTransportFileName` path segment.
+Two operator preflight requests in the same capture set are excluded from every
+finding below.
+
+### VERIFIED
+
+| Finding | Evidence |
+| --- | --- |
+| Method is `POST` | all six deliveries |
+| **A Test Transport** appends the literal segment `testTransportFileName` to the configured URL path | configured 4 segments, received 5 |
+| **A Test Transport** adds the query parameter `reason=TEST` | all six |
+| **No report-type header was observed** on any Test Transport | no `Content-Type`, no `Content-Disposition`, no report header |
+| **No `Content-Type` is sent at all** | all six |
+| **No `Content-Disposition` is sent** | all six |
+| Authentication is **HTTP Basic**, RFC 7617 | scheme token `Basic`, valid base64, decoded form contains a colon |
+| Blank Username and Password send **no** `Authorization` header | deliveries with blank fields carried none |
+| The tunnel preserves `Authorization` intact | operator preflight confirmed, so absence is Seed Live's behavior, not tunnel stripping |
+| **HTTP 200 is accepted as success** | Seed Live reported "Transport Result Success: 200" |
+| The Test Transport payload is a **fixed 33-byte plain-text string** | identical SHA-256 across all six deliveries |
+| `As Zip File` changes **nothing** on the wire for a Test Transport | byte-identical request before and after enabling it |
+| The Test Transport does **not** exercise report generation | credential changes propagated, zip setting did not |
+| Registering a report against a transport does **not** by itself trigger a real delivery | `Single Transaction Data Export -> SmartVend Discovery Test` produced only Test Transports |
+| The **saved** transport sends no `Authorization` header | credentials entered in the unsaved form did not persist into the registered transport |
+| A concurrent pair of deliveries occurred 0.217s apart | distinct `Cf-Ray` and `Traceparent`, so two separate HTTP requests |
+
+### INFERRED ONLY
+
+- The 0.217s pair was caused by **two different configured transports** firing
+  at once. Two distinct requests are proven; their origin is not.
+- A real report will substitute an actual filename for `testTransportFileName`.
+- `As Zip File` applies at the file-generation layer that a Test Transport
+  never reaches.
+
+### NOT VERIFIED
+
+- **How a real delivery identifies its report.** Everything observed about the
+  path and query comes from a *Test Transport*. It is **not** established that
+  a real report appends its actual filename, that any appended filename
+  identifies the report type, or that report type is conveyed anywhere at all
+  on a real delivery. Test Transport behavior must not be generalized into the
+  real delivery contract.
+- **Multiple transports can coexist.** The concurrent pair is consistent with
+  this but does not establish it. Two requests may have originated from one
+  transport.
+- Whether a real delivery sets `Content-Type`.
+- Whether `202` or any 2xx other than 200 is accepted.
+- Retry behavior. See the note below.
+
+### Note on the identical payloads
+
+Precisely what is and is not established:
+
+- **VERIFIED** the requests were distinct HTTP deliveries, each with its own
+  `Cf-Ray` and `Traceparent`.
+- **VERIFIED** all received HTTP 200.
+- **VERIFIED** their payloads were byte-identical.
+- **NOT VERIFIED** whether any were provider retries, duplicate Test Transport
+  executions, or some other internal Seed Live delivery behavior.
+
+There is **no evidence of failure-triggered retry behavior yet**. Retry
+behavior stays unresolved until we deliberately return a failure status and
+observe what Seed Live does.
 
 ## 2. Consequences of the live-only limitation
 
@@ -77,18 +154,21 @@ guess in every one of these areas.
 
 ### 4.1 Authentication
 
-- How does Seed Live authenticate to our endpoint? Static header, basic auth,
-  HMAC signature, mutual TLS, query token, or nothing at all?
-- Can a per-connection secret be configured in the transport?
-- Is there a signature over the body, and if so what is signed, with what
-  algorithm, and where is it carried?
-- Can we rotate a credential without breaking delivery?
+**RESOLVED 2026-08-12. See section 1A.** The mechanism is **HTTP Basic**,
+configured through the transport's Username and Password fields, transmitted as
+a standard `Authorization: Basic` header per RFC 7617. Blank fields send no
+header at all. No signature, no token, no custom header.
 
-**Nothing about authentication is implemented.** The code defines the
-`InboundAuthenticator` boundary and a deny-by-default implementation that
-rejects every request. The route is not registered in the application. Inventing
-a header contract and calling it Cantaloupe behavior would produce an endpoint
-that looks authenticated and is not.
+Still open:
+
+- Whether the password can be rotated without recreating the transport.
+- Whether Seed Live enforces TLS certificate validation on our endpoint.
+
+**Authentication is still not implemented in code.** The
+`InboundAuthenticator` boundary and its deny-by-default implementation remain
+as they are, and the route remains unregistered. Knowing the mechanism is not
+the same as having implemented and reviewed it, and the requirements in
+section 12 still gate registration.
 
 ### 4.2 HTTP wire format
 
@@ -98,19 +178,23 @@ that looks authenticated and is not.
   payload, gzip.
 - Character encoding and whether a BOM is present.
 - Whether a filename is supplied, and in which header or form field.
-- Whether the report type is conveyed anywhere in the request, and how.
-  **Nothing in the HTTP adapter reads a report-type signal.** The
-  provider-neutral `InboundReportRequest.report_type_hint` exists for an
-  adapter that has a verified source; the Cantaloupe adapter leaves it unset.
-  Candidates once a real delivery is captured: a header, the filename, a query
-  parameter, content disposition, body structure, or the transport
-  configuration itself. We do not choose one now.
+- **How a real delivery identifies its report is still unknown.** A Test
+  Transport appends the literal segment `testTransportFileName` and adds
+  `reason=TEST`, and carries no report-type header. None of that establishes
+  the real contract. Unresolved: whether a real report appends its actual
+  filename, whether such a filename identifies the report type, and whether
+  report type is conveyed anywhere else on a real delivery.
+  **The HTTP adapter reads no report-type signal**, and
+  `InboundReportRequest.report_type_hint` stays unset until a real delivery is
+  observed.
 - Maximum body size Seed Live will send. Our 25 MiB limit is a conservative
   guard, not a number derived from the provider.
 
 ### 4.5 Response contract
 
-- Does Seed Live accept `200` as success?
+**Partly resolved 2026-08-12. `200` is accepted as success**, confirmed by Seed
+Live's own "Transport Result Success: 200". The remaining questions stand:
+
 - Does it accept `202`?
 - Does it accept any `2xx`, or only specific codes?
 - Does it require a particular response body, or a content type?
@@ -327,6 +411,79 @@ before the corresponding code is written.
 - intervals and whether backoff is applied
 - the timeout before a delivery is considered failed
 - duplicate delivery behavior, and under what conditions a report is resent
+
+## 10A. Account activity: RESOLVED
+
+**VERIFIED 2026-08-13.** The account contains real transaction history.
+
+Evidence path: **Build a Report -> Simple Report**. This is a distinct
+navigation route from Reports -> Report Register, and it is the one that
+produced usable evidence.
+
+| Finding | Status |
+| --- | --- |
+| The account contains real activity | VERIFIED |
+| Historical activity is visible in **September 2025** | VERIFIED |
+| **2025-09-26** is active, with non-zero transaction amounts | VERIFIED |
+| The report spans **11 pages**, so this is not an empty or non-production account | VERIFIED |
+| Simple Report is aggregated **by day and payment type**, and is **not** sufficient for transaction-level migration or schema discovery | VERIFIED |
+
+### Why the earlier exports were empty
+
+This resolves the earlier puzzle rather than contradicting it. Both empty
+exports sampled **2026** dates:
+
+| Export | Period sampled | Result |
+| --- | --- | --- |
+| Activity - All | 2026-08-01 to 2026-08-12 | header row only, zero data rows |
+| Pending Payment Summary | run 2026-08-07 | 7 sections, 2 data rows, every monetary column blank |
+
+Activity exists in **2025**. The exports were not faulty and the transport was
+not at fault: **the date ranges were wrong for this account**. The account
+appears to be dormant in the recent period we sampled.
+
+Operational consequence: **every future discovery export must target a period
+with confirmed activity**, starting with 2025-09-26. Sampling recent dates on
+this account will keep returning empty files and will keep looking like a
+tooling failure when it is not.
+
+### Sent Reports history does not cover the active period
+
+**VERIFIED 2026-08-13.** This path:
+
+```
+Reports -> Report Register
+  -> Transactions Included in EFT (<operator>)
+  -> Filter By: User Report
+  -> 09/01/2025 through 10/15/2025
+```
+
+The registered report is named after the vending operator. The name is omitted
+here because this repository is public; it is a customer identifier and adds
+nothing to the finding, which is about the path and the result.
+
+returned **"No data found"**.
+
+What this proves: the **Sent Reports history** for that registered report holds
+no retrievable file for the confirmed-active September 2025 period, so it is
+not a source of transaction-level evidence for that window.
+
+What this does **not** prove: that the underlying EFT data did not exist. Only
+the Sent Reports result is established. A registered report's sent history
+reflects what was generated and retained, which is a different thing from what
+transactions occurred.
+
+Consequence: retrieving an already-sent historical file is not a viable route
+to the transaction-level schema for September 2025. Evidence will have to come
+from generating a report over that period, or from another mechanism.
+
+### Next
+
+Obtain transaction-level evidence for a confirmed-active window, ideally the
+single day 2025-09-26. Given the Sent Reports result above, this most likely
+means **generating** a Single Transaction Data Export over that period rather
+than retrieving an existing one. Keep the window narrow: 11 pages of aggregated
+activity implies substantial underlying volume, and this is real customer data.
 
 ## 11. Test transport procedure
 

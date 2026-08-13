@@ -34,9 +34,66 @@ pushes to it.
 
 ## Current milestone
 
-Seed Live provider discovery and inbound integration boundary.
+Seed Live Test Transport discovery. Session run 2026-08-12 and 2026-08-13.
 
-Discovery document: `docs/integrations/CANTALOUPE_SEEDLIVE_INTEGRATION.md`.
+Discovery document: `docs/integrations/CANTALOUPE_SEEDLIVE_INTEGRATION.md`,
+section 1A holds the captured evidence and its classifications.
+
+Six genuine Seed Live deliveries were captured through a temporary Cloudflare
+tunnel into a standalone harness, `scripts/seedlive_capture.py`. Raw evidence is
+under `data/seedlive/`, gitignored, never to be committed. The tunnel and
+listener have been shut down.
+
+**Resolved:** authentication is HTTP Basic via the transport's Username and
+Password fields; no `Content-Type` or `Content-Disposition` is sent on a Test
+Transport; HTTP 200 is accepted as success.
+
+**Explicitly NOT verified:**
+
+- **How a real delivery identifies its report.** A Test Transport appends the
+  literal segment `testTransportFileName`, adds `reason=TEST`, and sends no
+  report-type header. None of that establishes the real contract. Whether a
+  real report appends its actual filename, whether such a filename identifies
+  the report type, and whether report type is conveyed anywhere else on a real
+  delivery are all open. Do not generalize Test Transport behavior into the
+  real delivery contract.
+- **That multiple transports can coexist.** A pair of deliveries 0.217s apart
+  is proven to be two distinct HTTP requests, but their origin is not
+  established. Two transports causing it is inference only.
+- **Retry behavior.** The four identical deliveries were distinct HTTP
+  requests, all received HTTP 200, and their payloads were byte-identical.
+  Whether any were provider retries, duplicate Test Transport executions, or
+  another internal Seed Live behavior is not established. There is no evidence
+  of failure-triggered retry behavior yet; that stays unresolved until we
+  deliberately return a failure and observe the result.
+
+**Not obtained:** any real report delivery. Registering
+`Single Transaction Data Export` against the transport produced only Test
+Transports, which send a fixed 33-byte string and do not exercise report
+generation. The real CSV schema remains unknown.
+
+**Account activity: VERIFIED 2026-08-13.** The account holds real transaction
+history. Evidence via **Build a Report -> Simple Report**: activity is visible
+in **September 2025**, **2025-09-26** is confirmed active with non-zero
+transaction amounts, and the report spans **11 pages**, so this is not an empty
+or non-production account. The Simple Report is aggregated by day and payment
+type and is **not** sufficient for transaction-level migration or schema
+discovery.
+
+This explains the two earlier empty exports rather than contradicting them:
+both sampled **2026** dates, and the activity is in **2025**. The exports were
+not faulty and the transport was not at fault, the date ranges were wrong for
+this account. **Every future discovery export must target a confirmed-active
+period**, starting with 2025-09-26.
+
+**Sent Reports history does not cover that period. VERIFIED 2026-08-13.**
+`Reports -> Report Register -> Transactions Included in EFT (<operator>)
+-> Filter By: User Report -> 09/01/2025 through 10/15/2025` returned
+**"No data found"**. This proves only that the *Sent Reports history* holds no
+retrievable file for that window. It does **not** prove the underlying EFT data
+did not exist. Consequence: retrieving an already-sent file is not a route to
+the September 2025 transaction-level schema; a report will have to be generated
+over that period instead.
 
 ## Verified Seed Live facts
 
@@ -54,8 +111,13 @@ Observed in the product, recorded as project evidence:
   historical backfill mechanism, so live-provider history is a separate dataset
   from live-provider ongoing delivery.
 
-Not verified, and therefore not implemented: authentication, HTTP wire format,
-retry behavior, and whether multiple simultaneous transports are supported.
+Superseded in part by the Test Transport session above, which verified the
+authentication mechanism and the wire shape **of a Test Transport**. Everything
+about a **real** delivery remains unverified: report identification, whether
+`Content-Type` is set, the filename convention, the report schema, retry
+behavior, and whether multiple simultaneous transports are supported.
+
+Verified does not mean implemented. Nothing about authentication has been built.
 
 ## Current state
 
@@ -137,11 +199,18 @@ no mapping, and no persistence has been written, by design.
 
 ## Blocked
 
-1. **A real Seed Live Test Transport is required** before finalizing the
-   request format, authentication, headers, report identification, retry
-   behavior, and every report schema. This is the critical path and it blocks
-   parsers, mappings, and registering the inbound route. The exact procedure is
-   in section 10 of the discovery document.
+1. **No real Seed Live report delivery has been obtained.** The Test Transport
+   session is complete and resolved authentication and the wire shape, but a
+   Test Transport sends a fixed synthetic string and never exercises report
+   generation. The real filename convention, the production `reason` value,
+   `Content-Type` on a real delivery, retry behavior, and every report schema
+   remain unknown. This still blocks parsers, mappings, and registering the
+   inbound route.
+
+   The earlier obstacle, whether the account holds any history at all, is
+   **resolved**: activity is confirmed in September 2025. See discovery
+   document section 10A. Discovery exports must target that period, not recent
+   dates.
 2. **Artifact and connection persistence.** The interfaces exist; no schema has
    been created. Creating one touches the shared canonical model and requires
    coordination with the consolidation workstream plus decision D1 on schema
@@ -158,17 +227,21 @@ and live-provider contract design can proceed now.
 
 ## Next
 
-1. **Run the Seed Live Test Transport** per section 10 of the discovery
-   document: stand up a capture endpoint, configure an HTTP POST transport,
-   record every configuration field and every delivered request byte for
-   byte, probe retry behavior with a deliberate 500, and record the findings.
-   Nothing downstream can be designed responsibly without this.
-2. Implement the verified authenticator, then register the inbound route.
-3. Write parsers only for report types whose schemas were captured.
-4. Settle schema authority and initialize Alembic with Ganesh, decision D1,
+1. **Obtain transaction-level evidence for 2025-09-26**, a single
+   confirmed-active day, to capture the real schema and whatever identifies a
+   real report. Sent Reports holds nothing for that window, so this most likely
+   means **generating** a Single Transaction Data Export rather than retrieving
+   one. Keep the window narrow: 11 pages of aggregated activity implies
+   substantial underlying volume, and this is real customer data.
+2. Then `Transaction Line Item Data Export` for the same day, for selection and
+   product-level fields.
+3. Implement the Basic authenticator, then register the inbound route, subject
+   to the requirements in discovery document section 12.
+4. Write parsers only for report types whose schemas were captured.
+5. Settle schema authority and initialize Alembic with Ganesh, decision D1,
    then create the artifact and connection persistence.
-5. Agree the minimum test and CI baseline, decision D5.
-6. Decide remediation for committed customer data and the exposed credential,
+6. Agree the minimum test and CI baseline, decision D5.
+7. Decide remediation for committed customer data and the exposed credential,
    decision D6.
 
 ## Known risks
@@ -205,4 +278,4 @@ Neither blocks the workstream. Both are candidates for a later EVO fix branch.
 
 ## Last updated
 
-2026-08-12T03:40:00Z
+2026-08-13T04:45:00Z

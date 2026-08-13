@@ -45,3 +45,9 @@ backend/debug_receipts/
 # never reach this repository, which is public.
 data/vendsoft/raw/
 data/vendsoft/reports/
+
+# Seed Live evidence. Covers Test Transport captures under captures/ and
+# downloaded report exports under historical/. Raw provider deliveries, real
+# customer financial data, settlement identifiers, and request headers that may
+# carry a credential. Never commit.
+data/seedlive/
