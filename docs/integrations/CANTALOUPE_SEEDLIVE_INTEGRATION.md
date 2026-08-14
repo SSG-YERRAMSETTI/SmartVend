@@ -113,9 +113,61 @@ Precisely what is and is not established:
 - **NOT VERIFIED** whether any were provider retries, duplicate Test Transport
   executions, or some other internal Seed Live delivery behavior.
 
-There is **no evidence of failure-triggered retry behavior yet**. Retry
-behavior stays unresolved until we deliberately return a failure status and
-observe what Seed Live does.
+Failure-triggered behavior has since been tested **for a Test Transport**: a
+500 produces no retry within three minutes, section 1A.1. That does not explain
+the identical payloads above, which all received 200, and it establishes
+nothing about a **real generated report delivery**, which remains untested.
+
+## 1A.1 Test Transport failure response, 2026-08-14
+
+A controlled failure experiment: the capture harness returned HTTP 500 to the
+first request, and would have returned 200 to any subsequent one. Observation
+window exceeded three minutes.
+
+### VERIFIED FOR TEST TRANSPORT
+
+| Finding | Evidence |
+| --- | --- |
+| **HTTP 500 is treated as a Test Transport failure** | Seed Live UI: `Transport Status: Invalid` |
+| The provider reports the failure with the status it received | UI: `Failure: TransportException:POST Request was not successful: 500 -` |
+| The UI marked the transport **Invalid immediately** | observed at the time of the request |
+| **Exactly one request was observed** | a single capture, sequence 001, on a freshly started listener |
+| **No automatic retry occurred within a window exceeding three minutes** | no second capture arrived |
+| No later HTTP 200 occurred, and the transport did **not** recover on its own | the harness was armed to return 200 to a second request; none came |
+| The failing request was otherwise identical to every prior Test Transport | same method, path `/…/testTransportFileName`, query `reason=TEST`, and byte-identical 33-byte payload, SHA-256 `b82bfa2f…` |
+| No `Authorization` header was sent | consistent with the saved transport carrying no credentials |
+
+Method note: the listener was started fresh so its sequence counter began at 1,
+and no preflight request was sent through the tunnel. The 500 was therefore
+served to Seed Live and not consumed by unrelated traffic.
+
+### NOT VERIFIED FOR REAL GENERATED REPORT DELIVERY
+
+Nothing above may be carried across to a real delivery. A Test Transport posts
+a fixed synthetic string and does not exercise report generation, and its HTTP
+client behavior has not been shown to match a real delivery's.
+
+Specifically unresolved for real deliveries:
+
+- whether a 500 triggers a retry at all
+- retry count
+- retry interval or backoff
+- whether 5xx is preferable to 4xx for delivery semantics
+- whether real report delivery uses the same HTTP client behavior as Test
+  Transport
+
+### Consequence for the authentication backend response
+
+**This experiment does not justify changing
+`BACKEND_UNAVAILABLE_STATUS_PROVISIONAL`.**
+
+The reasoning is unchanged: the provisional 404 exists to preserve enumeration
+protection, and the argument against it is that a real delivery should be
+retried after our secret store recovers. This experiment says nothing about
+real deliveries, so the trade-off it was blocked on is still unmeasured.
+
+The production response policy for an authentication-backend outage therefore
+**remains unresolved**, and 404 remains provisional.
 
 ## 1B. Transaction-level evidence, 2026-08-13
 
@@ -470,6 +522,11 @@ Live's own "Transport Result Success: 200". The remaining questions stand:
 turn an assumption into a contract.
 
 ### 4.3 Delivery semantics
+
+Partially answered for a **Test Transport** in section 1A.1: a 500 is treated
+as failure, is reported immediately as `Invalid`, and produces no retry within
+three minutes. Every question below remains open for a **real generated report
+delivery**.
 
 - Retry behavior on non-2xx: does it retry, how many times, with what interval?
 - Which status codes does Seed Live treat as success? Does 202 satisfy it?

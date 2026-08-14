@@ -67,12 +67,33 @@ Transport; HTTP 200 is accepted as success.
 - **That multiple transports can coexist.** A pair of deliveries 0.217s apart
   is proven to be two distinct HTTP requests, but their origin is not
   established. Two transports causing it is inference only.
-- **Retry behavior.** The four identical deliveries were distinct HTTP
-  requests, all received HTTP 200, and their payloads were byte-identical.
-  Whether any were provider retries, duplicate Test Transport executions, or
-  another internal Seed Live behavior is not established. There is no evidence
-  of failure-triggered retry behavior yet; that stays unresolved until we
-  deliberately return a failure and observe the result.
+- **Retry behavior on a real delivery.** Untested. See below for what a Test
+  Transport does. The four identical successful deliveries were distinct HTTP
+  requests, all received HTTP 200, and their payloads were byte-identical;
+  whether any were provider retries, duplicate Test Transport executions, or
+  another internal Seed Live behavior is not established.
+
+**Test Transport failure behavior. VERIFIED 2026-08-14.** Controlled 500
+experiment, discovery document section 1A.1. Seed Live UI immediately showed
+`Transport Status: Invalid` and
+`Failure: TransportException:POST Request was not successful: 500 -`. Exactly
+one request arrived, and **no automatic retry occurred within a window
+exceeding three minutes**, on a listener armed to return 200 to any second
+request. The transport did not recover on its own. The failing request was
+otherwise identical to every prior Test Transport, same path, same
+`reason=TEST`, byte-identical 33-byte payload.
+
+**NOT VERIFIED for real generated report deliveries:** whether a 500 triggers a
+retry, retry count, interval or backoff, whether 5xx is preferable to 4xx, and
+whether real delivery uses the same HTTP client behavior as Test Transport. A
+Test Transport posts a fixed synthetic string and does not exercise report
+generation.
+
+**This does not justify changing `BACKEND_UNAVAILABLE_STATUS_PROVISIONAL`.**
+The provisional 404 exists to preserve enumeration protection, and the case
+against it rests on real-delivery retry semantics, which remain unmeasured. The
+production response policy for an authentication-backend outage stays
+unresolved.
 
 **Not obtained:** any real report delivery **over a transport**. Registering
 `Single Transaction Data Export` against the transport produced only Test
@@ -408,4 +429,4 @@ Neither blocks the workstream. Both are candidates for a later EVO fix branch.
 
 ## Last updated
 
-2026-08-14T03:00:00Z
+2026-08-14T02:15:00Z
