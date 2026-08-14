@@ -34,10 +34,12 @@ pushes to it.
 
 ## Current milestone
 
-Seed Live Test Transport discovery. Session run 2026-08-12 and 2026-08-13.
+Seed Live provider discovery. Sessions 2026-08-12 and 2026-08-13, covering the
+Test Transport wire contract and the first transaction-level dataset.
 
-Discovery document: `docs/integrations/CANTALOUPE_SEEDLIVE_INTEGRATION.md`,
-section 1A holds the captured evidence and its classifications.
+Discovery document: `docs/integrations/CANTALOUPE_SEEDLIVE_INTEGRATION.md`.
+Section 1A holds the Test Transport evidence; section 1B holds the
+transaction-level evidence and the provisional transaction contract in 1B.1.
 
 Six genuine Seed Live deliveries were captured through a temporary Cloudflare
 tunnel into a standalone harness, `scripts/seedlive_capture.py`. Raw evidence is
@@ -67,10 +69,15 @@ Transport; HTTP 200 is accepted as success.
   of failure-triggered retry behavior yet; that stays unresolved until we
   deliberately return a failure and observe the result.
 
-**Not obtained:** any real report delivery. Registering
+**Not obtained:** any real report delivery **over a transport**. Registering
 `Single Transaction Data Export` against the transport produced only Test
 Transports, which send a fixed 33-byte string and do not exercise report
-generation. The real CSV schema remains unknown.
+generation. The schema of a **delivered** report, and everything about the real
+delivery wire contract, remains unknown.
+
+This is distinct from the transaction-level schema recorded below, which came
+from a **UI export**, not a transport delivery. Do not assume the two are the
+same shape.
 
 **Account activity: VERIFIED 2026-08-13.** The account holds real transaction
 history. Evidence via **Build a Report -> Simple Report**: activity is visible
@@ -85,6 +92,68 @@ both sampled **2026** dates, and the activity is in **2025**. The exports were
 not faulty and the transport was not at fault, the date ranges were wrong for
 this account. **Every future discovery export must target a confirmed-active
 period**, starting with 2025-09-26.
+
+**Transaction-level evidence obtained. VERIFIED 2026-08-13.** Via
+**Reports -> Payments -> Transactions in Payment -> historical payment batch**,
+exported as CSV. 16 columns, 1,586 rows, 2025-09-19 to 2025-09-26, flat and
+uniform. The CSV carries four columns the UI did not display. Full analysis and
+classifications in discovery document section 1B; a provisional
+provider-neutral transaction contract is in 1B.1.
+
+Tightened classifications that must not be loosened without new evidence:
+
+- `Tran #` is unique **within this export only**. Global uniqueness across Seed
+  Live history, operators, and accounts is **NOT VERIFIED**. It is the leading
+  provider transaction external-ID candidate, **not a proven global natural
+  key**.
+- Device-to-Terminal 1:1 holds **within this export only**. That it holds across
+  the operator's history is **NOT VERIFIED**.
+- `AP Code` is populated on non-cash rows and blank on cash rows, with high
+  uniqueness. Payment or authorization relation is **INFERRED**. Exact
+  semantics, whether it is an authorization identifier, and whether it is stable
+  or reusable as an external identity are **NOT VERIFIED**. **Do not build an
+  AP-code identity model.**
+- `Details` tokenizes deterministically into 134 short code-like tokens with
+  prices and quantities. Vending selection identifiers is **INFERRED**. MDB
+  selection numbers, planogram slot IDs, and product IDs are **NOT VERIFIED**.
+  **Do not call them MDB codes. Do not finalize the selection crosswalk until
+  planogram or product evidence exists.**
+- Whether the CSV export covers all four UI pages is **NOT VERIFIED**. Only the
+  1,586 rows across the observed range are established. Row count alone proves
+  nothing about page coverage.
+- Timezone and currency are absent from the data and **cannot be derived from
+  it**.
+
+No schema and no migration follows from this yet.
+
+**UI capability survey. VERIFIED 2026-08-13. Discovery on this account is
+closed.** Full detail in discovery document section 1C.
+
+Administration exposes only W-9, Complete Order, Refunds, Regions, and Campus
+Cards, with **no device, machine, product, planogram, coil, selection, or
+inventory configuration**. Device Management offers RMA and transfer only.
+Configuration offers no product, planogram, or selection management. DEX Status
+returned no data for the known-active September 2025 period. Payments is the one
+productive source. Sprout Transaction Line Item Data Export advertises
+`Coil Name`, `Price`, and `Quantity`, but **this dormant account has no Daily
+Export batch available to produce a sample**.
+
+Consequently:
+
+- Selection to product resolution: **NOT VERIFIED**
+- `Details` short codes: **INFERRED** likely selection identifiers only
+- `Coil Name`: **VERIFIED** as an advertised Sprout export field, **NOT
+  VERIFIED** against the `Details` short codes. They are not shown to be the
+  same thing
+- MDB interpretation: **NOT VERIFIED**
+
+**This account cannot provide enough evidence to complete the selection and
+product mapping.** Do not keep probing unrelated Seed Live UI areas.
+
+Resolution requires one of: a currently active Seed Live account producing
+Sprout Transaction Line Item Data Export; a provider-supplied sample or file
+specification; a planogram or product export from Cantaloupe / Seed Live; or
+another authorized customer account with usable line-item history.
 
 **Sent Reports history does not cover that period. VERIFIED 2026-08-13.**
 `Reports -> Report Register -> Transactions Included in EFT (<operator>)
@@ -227,14 +296,28 @@ and live-provider contract design can proceed now.
 
 ## Next
 
-1. **Obtain transaction-level evidence for 2025-09-26**, a single
-   confirmed-active day, to capture the real schema and whatever identifies a
-   real report. Sent Reports holds nothing for that window, so this most likely
-   means **generating** a Single Transaction Data Export rather than retrieving
-   one. Keep the window narrow: 11 pages of aggregated activity implies
-   substantial underlying volume, and this is real customer data.
-2. Then `Transaction Line Item Data Export` for the same day, for selection and
-   product-level fields.
+Discovery on this account is closed. The next steps split into implementation
+that verified evidence already supports, and external dependencies that no
+amount of further probing here will resolve.
+
+**Implementation, on verified evidence:**
+
+1. Implement the **HTTP Basic inbound authenticator**, replacing the
+   deny-by-default placeholder. The mechanism is verified and this work depends
+   on no unresolved report schema.
+2. Optionally, a **provider-neutral `Details` tokenizer** as a pure parsing
+   utility. Deterministic tokenization is verified; the tokens stay unresolved
+   and are not mapped to products.
+
+**External dependencies, blocking and not resolvable here:**
+
+3. Selection to product mapping, requiring one of the four options above.
+4. **Timezone** Seed Live uses for report timestamps, from account settings or
+   provider documentation. The data cannot answer it.
+5. The real **delivery wire contract**, which needs a live delivery on an active
+   account.
+6. Whether single-location and single-asset is a property of the account or of
+   that payment, and whether the CSV export covers all UI pages.
 3. Implement the Basic authenticator, then register the inbound route, subject
    to the requirements in discovery document section 12.
 4. Write parsers only for report types whose schemas were captured.
@@ -278,4 +361,4 @@ Neither blocks the workstream. Both are candidates for a later EVO fix branch.
 
 ## Last updated
 
-2026-08-13T04:45:00Z
+2026-08-13T21:30:00Z

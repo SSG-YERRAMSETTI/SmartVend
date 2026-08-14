@@ -117,6 +117,196 @@ There is **no evidence of failure-triggered retry behavior yet**. Retry
 behavior stays unresolved until we deliberately return a failure status and
 observe what Seed Live does.
 
+## 1B. Transaction-level evidence, 2026-08-13
+
+The first genuine transaction-level dataset. Obtained through
+**Reports -> Payments -> Transactions in Payment -> historical payment batch**,
+exported as CSV. Raw file held under `data/seedlive/historical/`, gitignored.
+
+This is the strongest Seed Live evidence we hold. The classifications below are
+deliberately tight, because it will be used for canonical design and an
+over-claim here propagates into the schema.
+
+**This is a UI export, not a transport delivery.** The schema recorded here is
+the shape of a file downloaded from the Payments screen. The schema of a report
+**delivered over an HTTP transport** remains **NOT VERIFIED**, along with the
+rest of the real delivery wire contract, and no delivered report has ever been
+obtained. **Do not assume the two are the same shape.** A parser written for
+the live path must be built against a captured delivery, not against this file.
+
+### File and shape
+
+| | |
+| --- | --- |
+| Size | 345,319 bytes |
+| Encoding | UTF-8, no BOM, LF line endings |
+| Structure | flat, 16 columns, 1,586 data rows, no ragged rows |
+
+Columns, in order:
+
+`Reference #`, `Reconcile Group`, `Trans Type`, `Settle State`, `Tran #`,
+`Device`, `Terminal`, `Location`, `Asset #`, `Client`, `Date`, `Card Type`,
+`Amount`, `AP Code`, `Details`, `Batch #`
+
+**The CSV carries four columns the UI did not display**: `Reference #`,
+`Reconcile Group`, `Trans Type`, `Settle State`.
+
+### VERIFIED
+
+- Rows are transaction-level: unique per-row identifier, per-row timestamp and
+  amount, zero identical rows, and zero identical even ignoring `Tran #` and
+  `Reference #`.
+- `Tran #` is populated on all 1,586 rows, 11 digits, and **unique within this
+  payment export**.
+- `Date` format is `MM/DD/YYYY hh:mm:ss AM/PM`, 12-hour with meridiem, always
+  carrying a time component. Rows are not date-sorted.
+- **No timezone is represented anywhere in the data.**
+- `Device` is 11 characters, 12 distinct. `Terminal` is 9 characters, 12
+  distinct. **Strict 1:1 correspondence within this export.**
+- `Location` and `Asset #` each hold exactly one distinct value in this export.
+- `Trans Type` has 7 values, spanning card, mobile-wallet, cash, and one
+  refund. `Settle State` has 2. `Card Type` has 15 distinct tender labels.
+- `Amount` is a `$9.99` string with an embedded currency symbol and always 2
+  decimals. Negatives use a leading minus. **No currency code column exists.**
+- `AP Code` is populated on every non-cash row and blank on every cash row in
+  this export. Where present it is 6 characters (one at 8), mixed alphanumeric,
+  and 99.61% unique among non-blank values.
+- The blank-`AP Code`, `Trans Type = Cash`, and `Settle State = Processed` sets
+  are **identical**, exactly 288 rows each, with no non-cash row missing an
+  `AP Code`.
+- `Details` is a composite field that **tokenizes deterministically**: all 2,730
+  items across 1,585 rows parsed against `token($price)` or
+  `token(qty * $price)` with zero failures. Item counts per row range 1 to 4.
+  Fifty items carry an explicit quantity multiplier.
+- `Details` yields 134 short code-like tokens of 4 characters or fewer, plus one
+  long name-like token. Short codes number 12 to 34 per device, 91 of 134 appear
+  on more than one device, and 70 of 134 carry a single consistent price. These
+  repeat in patterns **consistent with vending selections**.
+- `Batch #` is 8 digits, 7 distinct, each mapping to exactly one `Reference #`,
+  and batches are **not** confined to a single calendar day.
+- `Reference #` is 10 digits and constant across every row.
+- `Reconcile Group` and `Client` are 100% blank.
+- Date coverage is 2025-09-19 to 2025-09-26, 8 distinct days, including the
+  confirmed-active date.
+- The CSV contains **1,586 rows across the observed date range**.
+
+### INFERRED
+
+- `Device` and `Terminal` may be two identifier systems for the same physical
+  unit.
+- `AP Code` is **likely payment or authorization related**. The pattern of
+  presence only on card tender, combined with near-total uniqueness, is
+  inconsistent with a selection or slot code.
+- The short `Details` tokens are **likely vending selection identifiers**.
+- The single long `Details` token is one named non-selection line item.
+
+### NOT VERIFIED
+
+- **`Tran #` global uniqueness.** Uniqueness is established *within this payment
+  export only*. Whether it is unique across all Seed Live history, or across
+  operators and accounts, is unknown. Treat it as the **leading provider
+  transaction external-ID candidate, not a proven global natural key.**
+- **That Device-to-Terminal 1:1 holds across the operator's full history.**
+  Only this export is evidence.
+- **`AP Code` semantics.** Whether it is an authorization identifier, and
+  whether it is stable or reusable as an external identity, is unknown.
+  **Do not build an AP-code identity model.**
+- **That the `Details` short codes are MDB selection numbers, planogram slot
+  identifiers, or product identifiers.** They must not be called MDB codes, and
+  **the selection crosswalk must not be finalized until planogram or product
+  evidence exists.**
+- **Whether the CSV export covers all UI pages.** The UI showed 4 pages; we have
+  not compared against a known UI total or count. Row count alone does not
+  establish coverage.
+- The meaning of `Asset #`, `Reconcile Group`, `Client`, and the distinction
+  between `Settled` and `Processed` beyond its correlation with tender.
+- Timezone and currency. Neither is derivable from this data.
+- Whether one location and one asset is a property of the account or of this
+  particular payment.
+
+### 1B.1 Provisional provider-neutral transaction contract
+
+**PROVISIONAL. Not a schema. No migration follows from this.** It records what
+this evidence supports, so canonical design can proceed without waiting on the
+unresolved items.
+
+| Field | Notes |
+| --- | --- |
+| SmartVend internal transaction ID | SmartVend-owned primary key |
+| tenant / operator ID | resolved from the connection, never from payload |
+| provider | `cantaloupe` |
+| provider transaction external ID | from `Tran #`. Candidate, not a proven global key |
+| connection ID | the customer-provider relationship |
+| machine / device mapping reference | resolved via crosswalk, not stored raw |
+| provider device identifier | from `Device` |
+| provider terminal identifier | from `Terminal` |
+| transaction timestamp as supplied | stored as provided, unconverted |
+| timezone status | **unresolved**, recorded as such |
+| transaction / tender type | from `Trans Type` |
+| settlement state | from `Settle State` |
+| signed amount | from `Amount`, sign preserved |
+| currency status | **unresolved**, no currency code in source |
+| provider payment / reference metadata | from `Reference #` |
+| batch / settlement grouping | from `Batch #` |
+| raw artifact reference | link to the preserved source artifact |
+| source row reference | position or identifier within the artifact |
+| line-item collection | from `Details`, **provisionally parsed** |
+| ingestion / idempotency metadata | hash, idempotency key, received timestamp |
+
+Binding rule, unchanged: **external provider identifiers remain crosswalk
+external identities and never become SmartVend primary keys.**
+
+## 1C. UI capability survey and the selection-to-product dead end
+
+**VERIFIED 2026-08-13.** A survey of the Seed Live UI establishes what this
+account can and cannot provide. This closes the discovery phase for this
+account: further probing of unrelated UI areas is not warranted.
+
+### What the UI exposes
+
+| Area | What it provides |
+| --- | --- |
+| Administration | **Only** W-9, Complete Order, Refunds, Regions, Campus Cards. **No device, machine, product, planogram, coil, selection, or inventory configuration.** |
+| Device Management | RMA and transfer functions only |
+| Configuration | No product, planogram, or selection management |
+| DEX Status | **No data** for the known-active September 2025 period |
+| Payments | **Transaction-level historical rows.** The one productive source, see section 1B |
+| Sprout Transaction Line Item Data Export | Advertises `Coil Name`, `Price`, `Quantity` and similar. **This dormant account has no Daily Export batch available to produce a sample.** |
+| Historical Payments `Details` | Parseable item-like codes, semantics unresolved |
+
+### Classification of the selection-to-product question
+
+| Item | Status |
+| --- | --- |
+| Selection to product resolution | **NOT VERIFIED** |
+| `Details` short codes | **INFERRED** likely selection identifiers only |
+| `Coil Name` | **VERIFIED** as an advertised Sprout export field. **NOT VERIFIED** against the `Details` short codes |
+| MDB interpretation | **NOT VERIFIED** |
+
+`Coil Name` and the `Details` short codes have **not** been shown to be the same
+thing. They come from different reports, and no sample of the former exists.
+
+### Conclusion
+
+**This account cannot provide enough evidence to complete the selection and
+product mapping.** The one report that advertises the required fields cannot be
+produced here, because the account is dormant and has no Daily Export batch.
+
+Continuing to probe this account's UI will not resolve it. Stop.
+
+### Explicit dependency for resolution
+
+Resolution requires **one** of:
+
+1. A currently active Seed Live account producing Sprout Transaction Line Item
+   Data Export.
+2. A provider-supplied sample file or file specification.
+3. A planogram or product export from Cantaloupe / Seed Live.
+4. Another authorized customer account with usable line-item history.
+
+Until one of these exists, the selection crosswalk cannot be finalized, and any
+code that maps a `Details` token to a product would be invention.
+
 ## 2. Consequences of the live-only limitation
 
 This is the single most important architectural consequence of the verified
