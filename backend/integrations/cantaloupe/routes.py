@@ -296,11 +296,11 @@ async def receive_report(
         ) from exc
 
     logger.info(
-        "cantaloupe report %s: artifact=%s connection=%s tenant=%s type=%s bytes=%d",
+        "cantaloupe report %s: artifact=%s connection=%s org_id=%s type=%s bytes=%d",
         "replayed" if result.duplicate else "received",
         result.artifact.id,
         connection_id,
-        result.artifact.tenant_id,
+        result.artifact.org_id,
         result.artifact.report_type,
         result.artifact.size_bytes,
     )

@@ -5,6 +5,8 @@ what makes that possible: it carries the customer-specific configuration and
 credential reference for one customer-provider relationship.
 
 Tenant identity is resolved from the connection, never from payload content.
+"tenant" is the architectural concept; `org_id` is SmartVend's concrete
+ownership identifier for it, per ADR-0002 D1a.
 """
 
 from __future__ import annotations
@@ -34,7 +36,11 @@ class IntegrationConnection:
     """
 
     id: str
-    tenant_id: str
+    #: Owning organization. The concrete representation of tenant identity;
+    #: see ADR-0002 D1a. A string here rather than a UUID so this package stays
+    #: free of database coupling; canonicalization belongs to the future
+    #: repository adapter.
+    org_id: str
     provider: Provider
     kind: ProviderKind
     status: ConnectionStatus
@@ -55,7 +61,7 @@ class IntegrationConnection:
         # Explicit so a credential reference never reaches a traceback or log
         # through the default dataclass repr.
         return (
-            f"IntegrationConnection(id={self.id!r}, tenant_id={self.tenant_id!r}, "
+            f"IntegrationConnection(id={self.id!r}, org_id={self.org_id!r}, "
             f"provider={self.provider.value!r}, status={self.status.value!r})"
         )
 

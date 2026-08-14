@@ -23,7 +23,7 @@ from integrations.inbound import EmptyPayload, InboundReportRequest
 from integrations.ingest import ingest_report
 
 from .conftest import (
-    OTHER_TENANT_ID,
+    OTHER_ORG_ID,
     AcceptingAuthenticator,
     FakeArtifactStore,
     RejectingAuthenticator,
@@ -61,10 +61,24 @@ class TestArtifactCreation:
         assert store.payloads[result.artifact.id] == binary
 
     def test_tenant_comes_from_the_connection(self, connection, store) -> None:
-        """Payload content must never determine the tenant."""
+        """Payload content must never determine the tenant.
+
+        Tenant identity is carried concretely as `org_id`, per ADR-0002 D1a.
+        """
         artifact = ingest(connection, store).artifact
-        assert artifact.tenant_id == connection.tenant_id
+        assert artifact.org_id == connection.org_id
         assert artifact.connection_id == connection.id
+
+    def test_payload_content_cannot_influence_org_id(self, store) -> None:
+        """A payload naming another organization changes nothing."""
+        connection = make_connection()
+        hostile = (
+            b'{"org_id":"' + OTHER_ORG_ID.encode() + b'",'
+            b'"tenant_id":"' + OTHER_ORG_ID.encode() + b'"}'
+        )
+        artifact = ingest(connection, store, payload=hostile).artifact
+        assert artifact.org_id == connection.org_id
+        assert artifact.org_id != OTHER_ORG_ID
 
     def test_unidentified_report_is_still_preserved(self, connection, store) -> None:
         artifact = ingest(connection, store).artifact
@@ -110,13 +124,13 @@ class TestIdempotency:
         a = make_connection()
         b = make_connection(
             connection_id="99999999-9999-9999-9999-999999999999",
-            tenant_id=OTHER_TENANT_ID,
+            org_id=OTHER_ORG_ID,
         )
         first = ingest(a, store)
         second = ingest(b, store)
 
         assert second.duplicate is False
-        assert second.artifact.tenant_id == OTHER_TENANT_ID
+        assert second.artifact.org_id == OTHER_ORG_ID
         assert first.artifact.idempotency_key != second.artifact.idempotency_key
 
 

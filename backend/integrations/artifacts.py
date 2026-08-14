@@ -54,7 +54,9 @@ class RawReportArtifact:
     """
 
     id: str
-    tenant_id: str
+    #: Owning organization, copied from the resolved connection. Never derived
+    #: from payload content. See ADR-0002 D1a.
+    org_id: str
     connection_id: str
     provider: Provider
     report_type: str
@@ -118,5 +120,11 @@ class ArtifactStore(Protocol):
         ...
 
     def find_by_idempotency_key(self, key: str) -> RawReportArtifact | None:
-        """Return the stored artifact for this key, or None."""
+        """Return the stored artifact for this key, or None.
+
+        DEFERRED, future SQL persistence checkpoint: the key already carries
+        organization scope cryptographically, but a database-backed
+        implementation must also filter on `org_id` explicitly. Ownership
+        should not rest solely on the scope embedded in a hash.
+        """
         ...

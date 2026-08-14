@@ -29,7 +29,7 @@ def content_hash(payload: bytes) -> str:
 
 def idempotency_key(
     *,
-    tenant_id: str,
+    org_id: str,
     connection_id: str,
     provider: str,
     payload_hash: str,
@@ -38,8 +38,20 @@ def idempotency_key(
 
     The same payload delivered twice on the same connection yields the same
     key, so a resend is recognised as a replay rather than new data. Different
-    tenants or connections never collide, even for byte-identical payloads,
-    because two customers can legitimately receive the same report content.
+    organizations (tenants) or connections never collide, even for
+    byte-identical payloads, because two customers can legitimately receive the
+    same report content.
+
+    Only the *values* are hashed; field names are not part of the digest, so
+    the 2026-08-14 rename of this parameter from `tenant_id` to `org_id` left
+    every derived key byte-identical. `test_hashing.py` pins the digest to a
+    literal so that stays true.
+
+    DEFERRED, future persistence checkpoint: `org_id` is a string today. When
+    it begins to come from `organizations.id`, which is UUID-backed, the
+    repository adapter must canonicalize it before it reaches this function.
+    Two equivalent UUID spellings would otherwise hash to different keys and
+    silently defeat replay detection.
 
     Report type is deliberately excluded: identification can fail or change as
     the provider contract becomes known, and the key must stay stable across
@@ -49,7 +61,7 @@ def idempotency_key(
     be rearranged to produce the same input string.
     """
     for name, value in (
-        ("tenant_id", tenant_id),
+        ("org_id", org_id),
         ("connection_id", connection_id),
         ("provider", provider),
         ("payload_hash", payload_hash),
@@ -63,7 +75,7 @@ def idempotency_key(
     digest.update(
         _FIELD_SEPARATOR.join(
             part.encode("utf-8")
-            for part in (tenant_id, connection_id, provider, payload_hash)
+            for part in (org_id, connection_id, provider, payload_hash)
         )
     )
     return digest.hexdigest()

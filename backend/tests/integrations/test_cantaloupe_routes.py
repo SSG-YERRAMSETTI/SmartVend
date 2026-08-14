@@ -6,12 +6,15 @@ registered in the production application, so these tests mount it themselves.
 
 from __future__ import annotations
 
+import ast
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from integrations.artifacts import RawReportArtifact
 from integrations.cantaloupe import routes
 from integrations.cantaloupe.routes import (
     BACKEND_UNAVAILABLE_DETAIL_PROVISIONAL,
@@ -29,6 +32,7 @@ from integrations.providers import Provider
 
 from .conftest import (
     CONNECTION_ID,
+    ORG_ID,
     FAKE_PASSWORD,
     FAKE_USERNAME,
     VALID_BASIC_HEADER,
@@ -142,6 +146,80 @@ class TestNoInventedProviderContract:
             BACKEND_DIR / "integrations" / "cantaloupe" / "routes.py"
         ).read_text(encoding="utf-8")
         assert "HTTP_202_ACCEPTED" not in source
+
+
+class TestOwnershipFieldNaming:
+    """ADR-0002 D1a: `org_id` is the concrete ownership identifier.
+
+    "tenant" remains correct as architectural prose, so these tests inspect
+    real identifiers via the AST rather than grepping text. A comment
+    explaining the rename must not fail the guard, and a resurrected
+    `tenant_id` attribute must not pass it.
+    """
+
+    def _production_identifiers(self) -> set[str]:
+        names: set[str] = set()
+        for path in sorted((BACKEND_DIR / "integrations").rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.arg):
+                    names.add(node.arg)
+                elif isinstance(node, ast.Attribute):
+                    names.add(node.attr)
+                elif isinstance(node, ast.Name):
+                    names.add(node.id)
+                elif isinstance(node, ast.keyword) and node.arg:
+                    names.add(node.arg)
+                elif isinstance(node, ast.AnnAssign) and isinstance(
+                    node.target, ast.Name
+                ):
+                    names.add(node.target.id)
+        return names
+
+    def test_no_concrete_tenant_id_identifier_remains(self) -> None:
+        assert "tenant_id" not in self._production_identifiers()
+
+    def test_org_id_is_the_identifier_in_use(self) -> None:
+        assert "org_id" in self._production_identifiers()
+
+    def test_no_compatibility_alias_creates_a_second_identifier(self) -> None:
+        """One ownership identifier, not two. ADR-0002 D1a is explicit."""
+        connection = make_connection()
+        artifact = RawReportArtifact(
+            id="a",
+            org_id=ORG_ID,
+            connection_id=CONNECTION_ID,
+            provider=Provider.CANTALOUPE,
+            report_type="unknown",
+            received_at=datetime.now(timezone.utc),
+            payload_hash="h",
+            size_bytes=1,
+            idempotency_key="k",
+        )
+        for obj in (connection, artifact):
+            assert hasattr(obj, "org_id")
+            assert not hasattr(obj, "tenant_id")
+
+    def test_successful_response_carries_no_org_identity(self) -> None:
+        client, _ = build_client()
+        response = client.post(PATH, content=PAYLOAD)
+        assert response.status_code == 200
+        assert ORG_ID not in response.text
+        assert "org_id" not in response.text
+
+    def test_pre_authentication_response_carries_no_org_identity(self) -> None:
+        """An unauthenticated caller learns nothing about ownership."""
+        client, _ = build_client(authenticator=RejectingAuthenticator())
+        response = client.post(PATH, content=PAYLOAD)
+        assert response.status_code == 404
+        assert ORG_ID not in response.text
+        assert "org" not in response.text.lower()
+
+    def test_artifact_ownership_is_scoped_to_the_connection_org(self) -> None:
+        client, store = build_client()
+        artifact_id = client.post(PATH, content=PAYLOAD).json()["artifact_id"]
+        stored = next(a for a in store.by_key.values() if a.id == artifact_id)
+        assert stored.org_id == ORG_ID
 
 
 class TestSuccessfulDelivery:

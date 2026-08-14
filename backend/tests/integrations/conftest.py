@@ -26,9 +26,9 @@ from integrations.credentials import (
 )
 from integrations.providers import Provider, ProviderKind
 
-TENANT_ID = "11111111-1111-1111-1111-111111111111"
+ORG_ID = "11111111-1111-1111-1111-111111111111"
 CONNECTION_ID = "22222222-2222-2222-2222-222222222222"
-OTHER_TENANT_ID = "33333333-3333-3333-3333-333333333333"
+OTHER_ORG_ID = "33333333-3333-3333-3333-333333333333"
 
 #: Fake credentials. Never real, never a value used anywhere else.
 CREDENTIAL_REF = "secretstore://test/not-a-real-credential"
@@ -48,14 +48,14 @@ VALID_BASIC_HEADER = basic_header(FAKE_USERNAME, FAKE_PASSWORD)
 def make_connection(
     *,
     connection_id: str = CONNECTION_ID,
-    tenant_id: str = TENANT_ID,
+    org_id: str = ORG_ID,
     provider: Provider = Provider.CANTALOUPE,
     status: ConnectionStatus = ConnectionStatus.ACTIVE,
     credential_ref: str | None = CREDENTIAL_REF,
 ) -> IntegrationConnection:
     return IntegrationConnection(
         id=connection_id,
-        tenant_id=tenant_id,
+        org_id=org_id,
         provider=provider,
         kind=ProviderKind.LIVE,
         status=status,

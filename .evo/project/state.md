@@ -34,7 +34,36 @@ pushes to it.
 
 ## Current milestone
 
-D1 integration persistence boundary, 2026-08-14. **Architecture and
+Ownership-field alignment, 2026-08-14. **Name-only rename; no behavior change,
+no persistence.**
+
+**CURRENT:** the integration layer now uses **`org_id`** as the concrete
+SmartVend ownership identifier, on `IntegrationConnection`, on
+`RawReportArtifact`, and as the `idempotency_key` parameter.
+
+**ARCHITECTURAL TERM:** **`tenant`** remains the general multi-tenancy and
+security concept, and stays in prose, docstrings, and test names describing
+isolation. Only concrete fields moved. See ADR-0002 D1a.
+
+The idempotency derivation is **byte-identical**. Only values are hashed, never
+field names, so no key changed. `test_hashing.py` pins the SHA-256 digest of
+fixed inputs to a literal computed *before* the rename, so any future change to
+the derivation fails loudly. The ownership **value source is unchanged**: it
+still comes from the resolved connection and never from payload content.
+
+`org_id` remains a `str` in this package, deliberately, so the integration layer
+stays free of database coupling. Two deferrals are recorded in code where they
+will be needed:
+
+- **UUID canonicalization** (`hashing.py`). `organizations.id` is UUID-backed.
+  When `org_id` starts coming from it, the repository adapter must canonicalize
+  the value, or two spellings of the same UUID will hash to different keys and
+  silently defeat replay detection.
+- **Artifact org scoping** (`artifacts.py`). `find_by_idempotency_key` is
+  hash-keyed. A SQL implementation must also filter on `org_id`, so ownership
+  does not rest solely on the scope embedded in a hash.
+
+Preceded by D1 integration persistence boundary, 2026-08-14. **Architecture and
 documentation only; no persistence contracts implemented.**
 
 - `docs/architecture/SMARTVEND_INTEGRATION_ARCHITECTURE_GUIDE.md` explains the
@@ -57,10 +86,7 @@ and mapping states UNRESOLVED, RESOLVED, AMBIGUOUS.
 **PRE-EXISTING COMPATIBILITY FIELDS**, untouched, and require a consumer
 inventory before any deprecation decision.
 
-**Follow-up required:** production integration code still uses `tenant_id`,
-including in the idempotency key derivation. Renaming to `org_id` is
-security-relevant and is the next implementation change, deliberately not done
-in this checkpoint.
+**Follow-up completed** by the ownership-field alignment below.
 
 Preceded by the Seed Live authentication boundary, 2026-08-14: HTTP Basic
 implemented behind the existing inbound boundary; route still unregistered.

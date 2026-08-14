@@ -266,7 +266,7 @@ Rules:
 
 ```
 integration_connection
-  id, tenant_id
+  id, org_id           owning organization; see ADR-0002 D1a
   provider            cantaloupe, nayax, vendsoft
   kind                live | historical
   display_name
@@ -286,7 +286,7 @@ is stored. This is the record that makes one connector serve many customers.
 
 ```
 source_artifact
-  id, tenant_id, connection_id
+  id, org_id, connection_id
   provider, report_type, report_version
   received_at
   content_hash        sha256 of the raw bytes
@@ -311,7 +311,7 @@ Rules:
 
 ```
 onboarding_run
-  id, tenant_id, status, started_at, completed_at
+  id, org_id, status, started_at, completed_at
   current_phase
 
 onboarding_dataset

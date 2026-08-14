@@ -67,8 +67,8 @@ def ingest_report(
     `IngestResult` on success, with `duplicate` set when the payload had
     already been received on this connection.
 
-    Tenant identity is taken from the resolved connection. Payload content
-    never determines the tenant.
+    Tenant identity is taken from the resolved connection, as `org_id`. Payload
+    content never determines the tenant.
     """
     # Nothing is inspected or persisted before this line.
     authenticator.verify(request, connection)
@@ -81,7 +81,7 @@ def ingest_report(
 
     payload_hash = content_hash(request.payload)
     key = idempotency_key(
-        tenant_id=connection.tenant_id,
+        org_id=connection.org_id,
         connection_id=connection.id,
         provider=connection.provider.value,
         payload_hash=payload_hash,
@@ -91,7 +91,7 @@ def ingest_report(
 
     artifact = RawReportArtifact(
         id=artifact_id_factory(),
-        tenant_id=connection.tenant_id,
+        org_id=connection.org_id,
         connection_id=connection.id,
         provider=connection.provider,
         report_type=identification.report_type,

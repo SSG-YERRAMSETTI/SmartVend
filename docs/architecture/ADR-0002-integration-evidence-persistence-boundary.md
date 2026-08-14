@@ -54,10 +54,12 @@ We do **not** introduce a second Tenant entity beside Organization. One concept
 with two competing representations is how a system acquires two sources of
 truth for ownership, which is the worst possible place to have one.
 
-**Production integration code is not refactored from `tenant_id` to `org_id` in
-this checkpoint.** The rename touches the idempotency key derivation, which is
-security-relevant and deserves its own reviewed change. It is recorded as the
-next implementation change.
+**Implemented 2026-08-14**, in a separate reviewed change as intended. Production
+integration code now uses `org_id` on `IntegrationConnection` and
+`RawReportArtifact`, and as the `idempotency_key` parameter. The rename was
+name-only: only values are hashed, never field names, so every derived key is
+byte-identical and the ownership value source is unchanged. The digest is now
+pinned to a literal in `test_hashing.py`.
 
 #### Correcting the tenant-column rule
 
@@ -190,10 +192,11 @@ never become the owner of a duplicate machine, product, or transaction model.**
 
 - Persistence contracts can now be designed against a correct picture of
   ownership rather than an assumed one.
-- The `tenant_id` to `org_id` rename becomes a required, reviewable follow-up
-  that touches the idempotency key. Until it lands, integration code and the
-  database disagree on the name of the ownership column, which is a real if
-  contained inconsistency.
+- The `tenant_id` to `org_id` rename landed on 2026-08-14, so integration code
+  and the database now agree on the name of the ownership column. `org_id`
+  remains a `str` in the integration package, deliberately, to keep it free of
+  database coupling; canonicalizing it against UUID-backed `organizations.id`
+  is deferred to the repository adapter.
 - Inherited organization ownership is permitted, so tenant isolation review
   must check join integrity, not merely the presence of a column.
 - The write port's absence blocks canonical writes entirely. Integration work
