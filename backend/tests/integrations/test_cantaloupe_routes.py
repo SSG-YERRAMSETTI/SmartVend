@@ -6,6 +6,7 @@ registered in the production application, so these tests mount it themselves.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,11 +14,14 @@ from fastapi.testclient import TestClient
 
 from integrations.cantaloupe import routes
 from integrations.cantaloupe.routes import (
+    BACKEND_UNAVAILABLE_DETAIL_PROVISIONAL,
+    BACKEND_UNAVAILABLE_STATUS_PROVISIONAL,
     MAX_PAYLOAD_BYTES,
     UNATTRIBUTABLE_DETAIL,
     UNATTRIBUTABLE_STATUS,
     get_artifact_store,
     get_connection_resolver,
+    get_credential_provider,
     get_inbound_authenticator,
 )
 from integrations.connections import ConnectionStatus
@@ -25,10 +29,15 @@ from integrations.providers import Provider
 
 from .conftest import (
     CONNECTION_ID,
+    FAKE_PASSWORD,
+    FAKE_USERNAME,
+    VALID_BASIC_HEADER,
     AcceptingAuthenticator,
     FakeArtifactStore,
     FakeConnectionResolver,
+    FakeCredentialProvider,
     RejectingAuthenticator,
+    basic_header,
     make_connection,
 )
 
@@ -240,21 +249,27 @@ class TestUnavailability:
         assert store.by_key == {}
         assert store.payloads == {}
 
-    def test_unconfigured_authenticator_is_identical_for_unknown_connections(
+    def test_unconfigured_credentials_are_identical_for_unknown_connections(
         self,
     ) -> None:
+        """An unconfigured credential provider leaks nothing about connections.
+
+        The provider is a dependency, so it fails before the route body runs.
+        Known and unknown connection identifiers therefore produce byte-identical
+        responses, closing the oracle that existed while the authenticator was a
+        deny-by-default placeholder resolved inside the handler.
+        """
         known, _ = build_client(authenticator=USE_REAL_AUTHENTICATOR)
         unknown, _ = build_client(
             connections=[], authenticator=USE_REAL_AUTHENTICATOR
         )
-        # An unknown connection is rejected earlier, so the two differ. That is
-        # acceptable only while the authenticator is unconfigured for everyone
-        # and the route is unregistered; once auth is configured the earlier
-        # rejection and the auth failure are identical.
-        assert known.post(PATH, content=PAYLOAD).status_code == 503
-        assert (
-            unknown.post(PATH, content=PAYLOAD).status_code == UNATTRIBUTABLE_STATUS
-        )
+
+        a = known.post(PATH, content=PAYLOAD)
+        b = unknown.post(PATH, content=PAYLOAD)
+
+        assert a.status_code == 503
+        assert b.status_code == 503
+        assert a.text == b.text
 
     def test_missing_connection_storage_returns_503(self) -> None:
         app = FastAPI()
@@ -273,6 +288,180 @@ class TestUnavailability:
         client = TestClient(app)
 
         assert client.post(PATH, content=PAYLOAD).status_code == 503
+
+
+class TestBasicAuthenticationThroughTheRoute:
+    """End-to-end HTTP Basic, using the real authenticator and fake secrets."""
+
+    def build(self, *, connections=None, provider=None):
+        app = FastAPI()
+        app.include_router(routes.router)
+        store = FakeArtifactStore()
+        resolver = FakeConnectionResolver(
+            *(connections if connections is not None else [make_connection()])
+        )
+        app.dependency_overrides[get_connection_resolver] = lambda: resolver
+        app.dependency_overrides[get_artifact_store] = lambda: store
+        app.dependency_overrides[get_credential_provider] = (
+            lambda: provider or FakeCredentialProvider()
+        )
+        return TestClient(app), store
+
+    def test_valid_credentials_accepted(self) -> None:
+        client, store = self.build()
+        response = client.post(
+            PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "accepted"
+        assert len(store.payloads) == 1
+
+    def test_missing_authorization_rejected_and_nothing_stored(self) -> None:
+        client, store = self.build()
+        response = client.post(PATH, content=PAYLOAD)
+        assert response.status_code == UNATTRIBUTABLE_STATUS
+        assert store.by_key == {}
+        assert store.payloads == {}
+
+    def test_wrong_password_rejected_and_nothing_stored(self) -> None:
+        client, store = self.build()
+        response = client.post(
+            PATH,
+            content=PAYLOAD,
+            headers={"Authorization": basic_header(FAKE_USERNAME, "wrong")},
+        )
+        assert response.status_code == UNATTRIBUTABLE_STATUS
+        assert store.by_key == {}
+
+    def test_connection_without_credential_looks_like_a_bad_password(self) -> None:
+        """The credential-existence oracle stays closed at the HTTP boundary."""
+        no_cred, _ = self.build(connections=[make_connection(credential_ref=None)])
+        bad_pass, _ = self.build()
+
+        a = no_cred.post(
+            PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}
+        )
+        b = bad_pass.post(
+            PATH,
+            content=PAYLOAD,
+            headers={"Authorization": basic_header(FAKE_USERNAME, "wrong")},
+        )
+        assert a.status_code == b.status_code == UNATTRIBUTABLE_STATUS
+        assert a.text == b.text
+
+    def test_all_failure_modes_are_indistinguishable(self) -> None:
+        unknown, _ = self.build(connections=[])
+        bad_scheme, _ = self.build()
+        bad_b64, _ = self.build()
+        wrong_user, _ = self.build()
+        no_cred, _ = self.build(connections=[make_connection(credential_ref=None)])
+        store_down, _ = self.build(provider=FakeCredentialProvider(unavailable=True))
+
+        responses = [
+            unknown.post(PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}),
+            bad_scheme.post(PATH, content=PAYLOAD, headers={"Authorization": "Bearer abc"}),
+            bad_b64.post(PATH, content=PAYLOAD, headers={"Authorization": "Basic !!!"}),
+            wrong_user.post(
+                PATH, content=PAYLOAD,
+                headers={"Authorization": basic_header("nobody", FAKE_PASSWORD)},
+            ),
+            no_cred.post(PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}),
+            store_down.post(PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}),
+        ]
+        assert {r.status_code for r in responses} == {UNATTRIBUTABLE_STATUS}
+        assert len({r.text for r in responses}) == 1, "responses must be identical"
+
+    def test_credentials_never_appear_in_a_response(self) -> None:
+        client, _ = self.build()
+        for headers in (
+            {"Authorization": VALID_BASIC_HEADER},
+            {"Authorization": basic_header(FAKE_USERNAME, "wrong")},
+        ):
+            r = client.post(PATH, content=PAYLOAD, headers=headers)
+            assert FAKE_PASSWORD not in r.text
+            assert FAKE_USERNAME not in r.text
+            assert headers["Authorization"] not in r.text
+
+    def test_credentials_never_appear_in_logs(self, caplog) -> None:
+        client, _ = self.build()
+        with caplog.at_level(logging.DEBUG):
+            client.post(
+                PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}
+            )
+            client.post(
+                PATH,
+                content=PAYLOAD,
+                headers={"Authorization": basic_header(FAKE_USERNAME, "wrong")},
+            )
+        logged = caplog.text
+        assert FAKE_PASSWORD not in logged
+        assert VALID_BASIC_HEADER not in logged
+        assert "Basic " not in logged
+
+    def test_credentials_never_reach_the_stored_artifact(self) -> None:
+        client, store = self.build()
+        client.post(
+            PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}
+        )
+        artifact = next(iter(store.by_key.values()))
+        rendered = repr(artifact) + repr(artifact.transport_metadata)
+        assert FAKE_PASSWORD not in rendered
+        assert "authorization" not in {k.lower() for k in artifact.transport_metadata}
+
+    def test_backend_outage_persists_nothing(self) -> None:
+        client, store = self.build(provider=FakeCredentialProvider(unavailable=True))
+        client.post(
+            PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}
+        )
+        assert store.by_key == {}
+        assert store.payloads == {}
+
+    def test_backend_outage_uses_the_provisional_mapping(self) -> None:
+        """PROVISIONAL. Not the final response; see the constant in routes.py."""
+        client, _ = self.build(provider=FakeCredentialProvider(unavailable=True))
+        response = client.post(
+            PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}
+        )
+        assert response.status_code == BACKEND_UNAVAILABLE_STATUS_PROVISIONAL
+        assert response.json()["detail"] == BACKEND_UNAVAILABLE_DETAIL_PROVISIONAL
+
+    def test_backend_outage_is_publicly_indistinguishable_but_logged_apart(
+        self, caplog
+    ) -> None:
+        """Uniform to the caller, distinct in telemetry."""
+        outage, _ = self.build(provider=FakeCredentialProvider(unavailable=True))
+        bad_pass, _ = self.build()
+
+        with caplog.at_level(logging.DEBUG):
+            a = outage.post(
+                PATH, content=PAYLOAD, headers={"Authorization": VALID_BASIC_HEADER}
+            )
+            b = bad_pass.post(
+                PATH,
+                content=PAYLOAD,
+                headers={"Authorization": basic_header(FAKE_USERNAME, "wrong")},
+            )
+
+        assert a.status_code == b.status_code
+        assert a.text == b.text, "public responses must be identical"
+
+        logged = caplog.text
+        assert "authentication backend unavailable" in logged
+        assert "authentication_failed" in logged
+        assert FAKE_PASSWORD not in logged
+        assert VALID_BASIC_HEADER not in logged
+
+    def test_successful_auth_preserves_the_deterministic_ingest_flow(self) -> None:
+        client, store = self.build()
+        headers = {"Authorization": VALID_BASIC_HEADER}
+        first = client.post(PATH, content=PAYLOAD, headers=headers)
+        second = client.post(PATH, content=PAYLOAD, headers=headers)
+
+        assert first.status_code == second.status_code == 200
+        assert first.json()["replay"] is False
+        assert second.json()["replay"] is True
+        assert second.json()["artifact_id"] == first.json()["artifact_id"]
+        assert len(store.payloads) == 1
 
 
 class TestAuthenticatedRejections:

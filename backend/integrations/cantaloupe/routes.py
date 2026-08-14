@@ -33,11 +33,13 @@ from pydantic import BaseModel
 
 from integrations.artifacts import ArtifactStore
 from integrations.authentication import (
+    AuthenticationBackendUnavailable,
     AuthenticationFailed,
     AuthenticationNotConfigured,
+    BasicAuthenticator,
     InboundAuthenticator,
-    UnverifiedProviderAuthenticator,
 )
+from integrations.credentials import CredentialProvider
 from integrations.cantaloupe.connector import CantaloupeConnector
 from integrations.connections import (
     ConnectionNotAcceptingInbound,
@@ -70,6 +72,30 @@ MAX_PAYLOAD_BYTES = 25 * 1024 * 1024
 #: outside. The real reason is logged internally.
 UNATTRIBUTABLE_STATUS = status.HTTP_404_NOT_FOUND
 UNATTRIBUTABLE_DETAIL = "Request could not be accepted."
+
+#: **PROVISIONAL.** What we return when our own authentication infrastructure
+#: cannot complete a check, such as an unreachable secret store.
+#:
+#: Internally this is `AuthenticationBackendUnavailable`, a class distinct from
+#: caller authentication failure, and it is logged and counted separately. The
+#: public status below is a **separate policy decision** and is not final.
+#:
+#: 404 is chosen for now only because it keeps every pre-authentication outcome
+#: byte-identical, which is what closes the connection-identifier enumeration
+#: oracle. It is the conservative choice while the route is unregistered.
+#:
+#: It is very likely the wrong long-term answer: a 4xx tells the provider the
+#: delivery failed permanently, when in fact it should be retried once our
+#: store recovers. A 5xx would express that correctly but would reveal that the
+#: connection identifier is real, because unknown identifiers are rejected
+#: earlier with 404.
+#:
+#: Resolving this requires the deliberate Seed Live failure and retry test:
+#: which statuses trigger a retry, how many, and with what backoff. Until then,
+#: **do not treat 404 as the final response for an authentication backend
+#: outage.** See the discovery document, section 4.5 and the retry questions.
+BACKEND_UNAVAILABLE_STATUS_PROVISIONAL = UNATTRIBUTABLE_STATUS
+BACKEND_UNAVAILABLE_DETAIL_PROVISIONAL = UNATTRIBUTABLE_DETAIL
 
 
 class ReportAcceptedResponse(BaseModel):
@@ -107,15 +133,35 @@ def get_artifact_store() -> ArtifactStore:
     )
 
 
-def get_inbound_authenticator() -> InboundAuthenticator:
+def get_credential_provider() -> CredentialProvider:
+    """Provide the connection credential resolver.
+
+    No backing secret store is wired yet. AWS Secrets Manager is the production
+    direction and is not part of this milestone, so this fails closed. Tests
+    override it with an in-memory provider.
+
+    The 503 is a server-wide condition, identical for every connection
+    identifier, so it reveals nothing about any particular connection.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Integration endpoint is not configured.",
+    )
+
+
+def get_inbound_authenticator(
+    credentials: CredentialProvider = Depends(get_credential_provider),
+) -> InboundAuthenticator:
     """Provide the inbound authenticator.
 
-    Deny-by-default until the Seed Live contract is verified. Selection is
-    provider-level today; once connections carry credential configuration this
-    becomes per-connection, which is why connection resolution happens before
-    authentication.
+    HTTP Basic, verified from a Seed Live Test Transport. The credential is
+    resolved per connection from its `credential_ref`, which is why connection
+    resolution happens before authentication.
+
+    Whether a real generated report delivery authenticates identically is NOT
+    VERIFIED. That, among other gates, is why the router remains unregistered.
     """
-    return UnverifiedProviderAuthenticator(Provider.CANTALOUPE.value)
+    return BasicAuthenticator(credentials)
 
 
 async def read_limited_body(request: Request, limit: int = MAX_PAYLOAD_BYTES) -> bytes:
@@ -217,6 +263,23 @@ async def receive_report(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Integration endpoint is not configured.",
+        ) from exc
+    except AuthenticationBackendUnavailable as exc:
+        # Our infrastructure failed, not the caller's credentials. Logged at
+        # error level with a distinct reason so an outage is visible in
+        # telemetry and never counted as an authentication failure.
+        #
+        # The public response is deliberately identical to a caller failure for
+        # now, purely to preserve enumeration protection. That mapping is
+        # PROVISIONAL and is the wrong retry signal; see the constant above.
+        logger.error(
+            "cantaloupe inbound: authentication backend unavailable "
+            "(connection_id=%s)",
+            connection_id,
+        )
+        raise HTTPException(
+            status_code=BACKEND_UNAVAILABLE_STATUS_PROVISIONAL,
+            detail=BACKEND_UNAVAILABLE_DETAIL_PROVISIONAL,
         ) from exc
     except AuthenticationFailed:
         raise _reject_unattributable("authentication_failed", connection_id) from None

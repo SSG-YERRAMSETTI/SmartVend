@@ -10,6 +10,8 @@ from dataclasses import replace
 
 import pytest
 
+import base64
+
 from integrations.artifacts import DuplicateArtifact, RawReportArtifact
 from integrations.authentication import AuthenticationFailed
 from integrations.connections import (
@@ -17,11 +19,30 @@ from integrations.connections import (
     ConnectionStatus,
     IntegrationConnection,
 )
+from integrations.credentials import (
+    BasicCredential,
+    CredentialNotFound,
+    CredentialProviderUnavailable,
+)
 from integrations.providers import Provider, ProviderKind
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
 CONNECTION_ID = "22222222-2222-2222-2222-222222222222"
 OTHER_TENANT_ID = "33333333-3333-3333-3333-333333333333"
+
+#: Fake credentials. Never real, never a value used anywhere else.
+CREDENTIAL_REF = "secretstore://test/not-a-real-credential"
+FAKE_USERNAME = "test-user-DO-NOT-USE"
+FAKE_PASSWORD = "test-password-DO-NOT-USE"
+
+
+def basic_header(username: str, password: str) -> str:
+    """Build an RFC 7617 Authorization header from a fake credential pair."""
+    token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+    return f"Basic {token}"
+
+
+VALID_BASIC_HEADER = basic_header(FAKE_USERNAME, FAKE_PASSWORD)
 
 
 def make_connection(
@@ -30,6 +51,7 @@ def make_connection(
     tenant_id: str = TENANT_ID,
     provider: Provider = Provider.CANTALOUPE,
     status: ConnectionStatus = ConnectionStatus.ACTIVE,
+    credential_ref: str | None = CREDENTIAL_REF,
 ) -> IntegrationConnection:
     return IntegrationConnection(
         id=connection_id,
@@ -38,8 +60,42 @@ def make_connection(
         kind=ProviderKind.LIVE,
         status=status,
         display_name="Test connection",
-        credential_ref="secretstore://test/not-a-real-credential",
+        credential_ref=credential_ref,
     )
+
+
+class FakeCredentialProvider:
+    """In-memory credential store. Fake values only, no network, no AWS."""
+
+    def __init__(
+        self,
+        mapping: dict[str, BasicCredential] | None = None,
+        *,
+        unavailable: bool = False,
+    ) -> None:
+        self.mapping = (
+            mapping
+            if mapping is not None
+            else {CREDENTIAL_REF: BasicCredential(FAKE_USERNAME, FAKE_PASSWORD)}
+        )
+        self.unavailable = unavailable
+        self.calls: list[str] = []
+
+    def resolve_basic(self, credential_ref: str) -> BasicCredential:
+        self.calls.append(credential_ref)
+        if self.unavailable:
+            raise CredentialProviderUnavailable()
+        try:
+            return self.mapping[credential_ref]
+        except KeyError as exc:
+            raise CredentialNotFound(credential_ref) from exc
+
+
+class MalformedCredentialProvider:
+    """Returns a credential that violates the contract, to prove fail-closed."""
+
+    def resolve_basic(self, credential_ref: str) -> BasicCredential:
+        raise ValueError("credential missing a password")
 
 
 class FakeArtifactStore:

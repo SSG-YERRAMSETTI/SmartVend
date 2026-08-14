@@ -68,7 +68,7 @@ finding below.
 | **No report-type header was observed** on any Test Transport | no `Content-Type`, no `Content-Disposition`, no report header |
 | **No `Content-Type` is sent at all** | all six |
 | **No `Content-Disposition` is sent** | all six |
-| Authentication is **HTTP Basic**, RFC 7617 | scheme token `Basic`, valid base64, decoded form contains a colon |
+| Authentication is **HTTP Basic**, matching RFC 7617 framing | scheme token `Basic`, valid base64, decoded form contains a colon |
 | Blank Username and Password send **no** `Authorization` header | deliveries with blank fields carried none |
 | The tunnel preserves `Authorization` intact | operator preflight confirmed, so absence is Seed Live's behavior, not tunnel stripping |
 | **HTTP 200 is accepted as success** | Seed Live reported "Transport Result Success: 200" |
@@ -343,6 +343,81 @@ Each item is a hole in the contract. Code must raise or decline rather than
 guess in every one of these areas.
 
 ### 4.1 Authentication
+
+**IMPLEMENTED 2026-08-14.** `BasicAuthenticator` in
+`backend/integrations/authentication.py` implements **HTTP Basic
+authentication compatible with the verified Seed Live Test Transport behavior
+and RFC 7617 framing, with SmartVend policy requiring UTF-8 credentials and a
+non-empty username and password.** The credential is resolved per connection
+from `credential_ref` through the `CredentialProvider` contract in
+`backend/integrations/credentials.py`.
+
+This is **not** a claim of standards equivalence. SmartVend is deliberately
+stricter than the RFC on two points: RFC 7617 leaves the credential charset
+undefined, and it permits an empty password. Both are refused here.
+
+- **Provider evidence:** HTTP Basic, verified from a Seed Live **Test
+  Transport**.
+- **Limit:** authentication behavior of a real **generated report delivery**
+  remains **NOT VERIFIED**. No real delivery has ever been captured.
+- **Route status:** still **unregistered** in `main.py`.
+
+The implementation fails closed on every path: missing header, unsupported
+scheme, malformed base64, undecodable bytes, a decoded credential with no
+colon, an empty supplied username or password, a connection with no
+`credential_ref`, an unresolvable reference, an unreachable secret store, and a
+wrong username or password. Username and password are both compared with
+`hmac.compare_digest`, and both comparisons always run so the response time does
+not reveal whether the username alone was correct.
+
+A connection with **no credential configured fails exactly like a wrong
+password**, because distinguishing them would tell an unauthenticated caller
+whether a credential reference exists.
+
+#### Internal failure classes are distinct
+
+Two conditions that look the same from outside are kept separate inside:
+
+| Class | Covers | Meaning |
+| --- | --- | --- |
+| `AuthenticationFailed` | missing or malformed header, unsupported scheme, wrong username or password, connection with no usable credential configuration | The **caller** is at fault, or the connection is misconfigured. Retrying unchanged will not help |
+| `AuthenticationBackendUnavailable` | secret store unreachable, timeout, any backing service failure | **Our** infrastructure could not complete the check. The caller may be perfectly legitimate |
+
+`AuthenticationBackendUnavailable` is deliberately **not** a subclass of
+`AuthenticationFailed`, and a `CredentialProviderUnavailable` is never converted
+into one. A test asserts the two are unrelated in the type hierarchy and that
+`except AuthenticationFailed` lets an outage through.
+
+The reason is operational, not aesthetic: collapsing them would make an outage
+indistinguishable from an attack in logs, metrics, and alerting, and would leave
+any future retry policy with nothing to branch on. Backend failures log at
+`error` with their own reason string; caller failures log at `warning`.
+
+#### Public response for a backend outage is PROVISIONAL
+
+The **public** HTTP status is a separate policy decision from the internal
+class, and it is **not settled**.
+
+Currently a backend outage returns the same `404` as every other
+pre-authentication outcome. That is the conservative choice while the route is
+unregistered, and it is what keeps the connection-identifier enumeration oracle
+closed.
+
+It is very likely the wrong long-term answer. A `4xx` tells Seed Live the
+delivery failed permanently, when it should be retried once our store recovers.
+A `5xx` would express that correctly but would reveal that the connection
+identifier is real, because unknown identifiers are rejected earlier with `404`.
+
+**NOT VERIFIED: what HTTP response Seed Live should receive when SmartVend's
+authentication backend is temporarily unavailable.** Resolving it requires the
+deliberate Seed Live failure and retry test: which statuses trigger a retry, how
+many, and with what backoff. Until then, **404 is not the final answer** for a
+secret-store failure. The mapping lives in one place,
+`BACKEND_UNAVAILABLE_STATUS_PROVISIONAL` in `cantaloupe/routes.py`.
+
+No secret store is wired. AWS Secrets Manager is the production direction and is
+not part of this work, so the credential provider dependency fails closed and
+tests supply an in-memory fake.
 
 **RESOLVED 2026-08-12. See section 1A.** The mechanism is **HTTP Basic**,
 configured through the transport's Username and Password fields, transmitted as
@@ -737,7 +812,8 @@ The router must not be registered in `main.py` until all of the following hold.
 | Cantaloupe connector | Identification only, parsing refuses |
 | Inbound route | Implemented, **not registered**. Returns 200 for accepted and for replay; all pre-authentication rejections normalized |
 | Report identification from a delivery | **Not implemented.** No verified source exists, so the adapter supplies no hint |
-| Authentication | **Boundary only, denies by default** |
+| Authentication | **HTTP Basic implemented and tested offline.** Real generated-report authentication remains NOT VERIFIED |
+| Credential resolution | Contract only. No secret store wired; AWS Secrets Manager deferred |
 | Parsers | Not implemented, by design |
 | Device and selection mapping | Not implemented, by design |
 | Queueing, S3, SQS, Bedrock | Not implemented, out of milestone scope |

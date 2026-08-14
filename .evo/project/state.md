@@ -34,8 +34,13 @@ pushes to it.
 
 ## Current milestone
 
-Seed Live provider discovery. Sessions 2026-08-12 and 2026-08-13, covering the
-Test Transport wire contract and the first transaction-level dataset.
+Seed Live authentication boundary, 2026-08-14. HTTP Basic implemented behind
+the existing inbound boundary; route still unregistered. Details under
+"Current implementation".
+
+Preceded by Seed Live provider discovery, sessions 2026-08-12 and 2026-08-13,
+covering the Test Transport wire contract and the first transaction-level
+dataset.
 
 Discovery document: `docs/integrations/CANTALOUPE_SEEDLIVE_INTEGRATION.md`.
 Section 1A holds the Test Transport evidence; section 1B holds the
@@ -245,6 +250,49 @@ environment configuration, and no network:
 - `routes.py` `POST /integrations/cantaloupe/{connection_id}/reports`,
   **not registered in main.py**
 
+**Authentication implemented 2026-08-14.**
+
+- CURRENT IMPLEMENTATION: HTTP Basic authenticator implemented and tested
+  offline. `BasicAuthenticator` in `authentication.py` implements HTTP Basic
+  authentication compatible with the verified Seed Live Test Transport behavior
+  and RFC 7617 framing, with SmartVend policy requiring UTF-8 credentials and a
+  non-empty username and password. This is deliberately stricter than the RFC,
+  which leaves the charset undefined and permits an empty password, so it is
+  not a claim of standards equivalence. It
+  verifies against a per-connection credential resolved from `credential_ref`
+  through the `CredentialProvider` contract in `credentials.py`. Username and
+  password are both compared with `hmac.compare_digest`, and both comparisons
+  always run.
+- PROVIDER EVIDENCE: HTTP Basic verified from a Seed Live **Test Transport**.
+- LIMIT: real generated-report authentication behavior remains **NOT
+  VERIFIED**. No real delivery has ever been captured.
+- ROUTE STATUS: **still unregistered**.
+
+Fails closed on every path, and a connection with no credential configured
+fails exactly like a wrong password, so an unauthenticated caller cannot learn
+whether a credential reference exists.
+
+- INTERNAL FAILURE CLASSES: caller authentication failure and authentication
+  infrastructure failure remain **distinct**. `AuthenticationFailed` covers a
+  bad or missing header, wrong credentials, and unusable credential
+  configuration. `AuthenticationBackendUnavailable` covers an unreachable
+  secret store or any backing service failure. The latter is **not** a subclass
+  of the former and is never converted into it, so an outage stays visible in
+  logs, metrics, and any future retry policy rather than being counted as an
+  attack. Backend failures log at `error`, caller failures at `warning`.
+- NOT VERIFIED: **what HTTP response Seed Live should receive when our
+  authentication backend is temporarily unavailable.** The public mapping is
+  currently the same `404` as every other pre-authentication outcome, which
+  preserves enumeration protection but is the wrong retry signal. It is marked
+  **PROVISIONAL** in one place,
+  `BACKEND_UNAVAILABLE_STATUS_PROVISIONAL` in `cantaloupe/routes.py`, and waits
+  on the deliberate Seed Live failure and retry test. **404 is not the final
+  answer here.**
+
+No secret store is wired. AWS Secrets Manager is the production direction and is
+deferred; the credential provider dependency fails closed and tests use an
+in-memory fake. No database schema changed.
+
 Two provider assumptions were found in review and removed:
 
 - The adapter reads **no** report-type signal from the request. Whether Seed
@@ -259,7 +307,7 @@ is checked after authentication. Full reasoning in section 5.1 of the discovery
 document, with the requirements that must hold before route registration in
 section 12.
 
-85 backend tests, all mocked, no network, no database.
+143 backend tests, all mocked, no network, no database, no AWS.
 
 ## In progress
 
@@ -302,12 +350,11 @@ amount of further probing here will resolve.
 
 **Implementation, on verified evidence:**
 
-1. Implement the **HTTP Basic inbound authenticator**, replacing the
-   deny-by-default placeholder. The mechanism is verified and this work depends
-   on no unresolved report schema.
-2. Optionally, a **provider-neutral `Details` tokenizer** as a pure parsing
-   utility. Deterministic tokenization is verified; the tokens stay unresolved
-   and are not mapped to products.
+1. ~~Implement the HTTP Basic inbound authenticator.~~ **Done 2026-08-14.**
+2. A **provider-neutral `Details` tokenizer** as a pure parsing utility.
+   Deterministic tokenization is verified; the tokens stay unresolved and are
+   not mapped to products. Deliberately excluded from the authentication
+   milestone.
 
 **External dependencies, blocking and not resolvable here:**
 
@@ -361,4 +408,4 @@ Neither blocks the workstream. Both are candidates for a later EVO fix branch.
 
 ## Last updated
 
-2026-08-13T21:30:00Z
+2026-08-14T03:00:00Z
