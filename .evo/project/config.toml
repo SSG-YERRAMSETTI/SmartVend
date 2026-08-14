@@ -124,6 +124,69 @@ approved_by = "pending"
 date = "2026-08-12"
 
 [[exception]]
+rule = "standards/database.md requires every tenant-scoped table to carry an explicit indexed tenant column"
+# SCOPE: this narrows WHERE the organization column must physically sit. It
+# grants no relaxation of organization isolation itself.
+reason = """
+Scope: column placement only. This exception does NOT weaken organization \
+isolation in any respect. Every query touching organization-scoped data must \
+still be organization-filtered, cross-organization access remains prohibited, \
+and organization context is still resolved from the authenticated principal or \
+the resolved connection, never from payload content. \
+\
+What is permitted: SmartVend may establish organization ownership transitively \
+through a mandatory parent relationship where structurally safe. \
+"Structurally safe" means the child's foreign key is NOT NULL, points at a row \
+that itself carries organization ownership, and cannot be reparented across \
+organizations. A nullable or reparentable foreign key does NOT qualify, and \
+such a table requires its own explicit organization column. Any table relying \
+on inheritance must document which parent carries ownership. \
+\
+What is NOT permitted: integration and control-plane ROOT entities still \
+require explicit organization ownership where appropriate, per ADR-0002 D1a \
+rule 1. Connections, artifacts, external identities, onboarding runs and \
+equivalent roots always carry org_id directly and never inherit it. \
+\
+Why: SmartVend's existing schema already relies on inheritance. 13 of 37 \
+tables carry no organization column, including slots, telemetry_events, \
+machine_inventory, daily_sales_summary, cash_collections and receipt_lines. \
+Consequence for review: tenant isolation review must verify join integrity, \
+not merely column presence, because inherited ownership is only as strong as \
+the join enforcing it. See ADR-0002 D1a. The EVO standard is not edited; this \
+records the project deviation.\
+"""
+approved_by = "pending"
+date = "2026-08-14"
+
+[[exception]]
+rule = "constitution/security.md requires secrets to live in a managed secret store, never in source or database"
+# SCOPE: documentation of one pre-existing violation. This authorises nothing.
+reason = """
+Scope: exactly one pre-existing column, webhooks.secret, which stores a secret \
+value directly in the database. Nothing else. \
+\
+This entry is DOCUMENTATION OF PRE-EXISTING SECURITY DEBT ONLY. It is not \
+authorization, and it grants no permission to anyone to store a secret value \
+anywhere. It exists so the violation is visible and tracked rather than \
+silently tolerated. \
+\
+It explicitly does NOT permit new integrations, or any new code, to store \
+secret values directly in a database row, in source, in configuration, in a \
+log, in an error message, or in a stored artifact. \
+\
+New integration credentials REQUIRE a credential reference plus an external \
+secret store. The database holds only the reference; the secret is fetched \
+when needed and never persisted by us. AWS Secrets Manager is the intended \
+production direction. \
+\
+Ownership: webhooks.secret predates the integration architecture and belongs \
+to the application workstream. It is deliberately not modified here. Its \
+remediation is theirs to schedule. See ADR-0002.\
+"""
+approved_by = "pending"
+date = "2026-08-14"
+
+[[exception]]
 rule = "constitution/security.md prohibits committing customer data"
 reason = "Pre-existing violations inherited from repository history: a PostgreSQL dump, seed spreadsheets carrying real customer site names, and real receipt images. Recorded as audit findings S2, S3 and S4. Remediation is gameplan decision D6 and requires human authorization."
 approved_by = "pending"

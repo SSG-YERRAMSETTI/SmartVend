@@ -99,8 +99,15 @@ Binding rules:
 - Money is fixed-precision decimal with explicit currency. Never float.
 - Timestamps are timezone-aware and stored UTC. Event time and ingestion time
   are distinct columns where both matter.
-- Every tenant-scoped table carries an indexed tenant column, included in
-  relevant unique constraints.
+- Ownership follows ADR-0002. "Tenant" is the architectural concept,
+  **Organization** is SmartVend's representation, and `org_id` referencing
+  `organizations.id` is the persistence identity. There is no `tenant_id`
+  column in this database.
+- Integration and control-plane **roots** carry explicit organization
+  ownership. Subordinate records may inherit it through a mandatory parent
+  relationship when that relationship is structurally guaranteed. The earlier
+  blanket rule, that every tenant-scoped table physically carries a tenant
+  column, was contradicted by the existing schema and is superseded.
 - Every externally-sourced record references its source system, source
   identifier, and originating source artifact.
 - Temporal bindings, device to machine and selection to slot, carry validity

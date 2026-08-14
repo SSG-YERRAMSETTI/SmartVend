@@ -34,9 +34,37 @@ pushes to it.
 
 ## Current milestone
 
-Seed Live authentication boundary, 2026-08-14. HTTP Basic implemented behind
-the existing inbound boundary; route still unregistered. Details under
-"Current implementation".
+D1 integration persistence boundary, 2026-08-14. **Architecture and
+documentation only; no persistence contracts implemented.**
+
+- `docs/architecture/SMARTVEND_INTEGRATION_ARCHITECTURE_GUIDE.md` explains the
+  terminology and mental model in plain English. Read it before the ADRs.
+- `docs/architecture/ADR-0002-integration-evidence-persistence-boundary.md`
+  records the decisions.
+
+**ADR-0002 decisions.** Tenant is the architectural concept, **Organization**
+is SmartVend's representation, and **`org_id` -> `organizations.id`** is the
+persistence identity. No second Tenant entity. The blanket rule that every
+tenant-scoped table carries a tenant column is **superseded**: control-plane
+roots carry explicit organization ownership, subordinate records may inherit it
+through a mandatory parent relationship, and organization context never derives
+from payload content. A canonical application **write port** is defined as a
+rule and **deliberately not designed**, because no service or repository layer
+exists in the application to design against. External identity uses a generic
+crosswalk with initial uniqueness `(connection_id, entity_type, external_id)`
+and mapping states UNRESOLVED, RESOLVED, AMBIGUOUS.
+`Machine.external_code` and `Machine.telemetry_device_id` are classified
+**PRE-EXISTING COMPATIBILITY FIELDS**, untouched, and require a consumer
+inventory before any deprecation decision.
+
+**Follow-up required:** production integration code still uses `tenant_id`,
+including in the idempotency key derivation. Renaming to `org_id` is
+security-relevant and is the next implementation change, deliberately not done
+in this checkpoint.
+
+Preceded by the Seed Live authentication boundary, 2026-08-14: HTTP Basic
+implemented behind the existing inbound boundary; route still unregistered.
+Details under "Current implementation".
 
 Preceded by Seed Live provider discovery, sessions 2026-08-12 and 2026-08-13,
 covering the Test Transport wire contract and the first transaction-level
@@ -429,4 +457,4 @@ Neither blocks the workstream. Both are candidates for a later EVO fix branch.
 
 ## Last updated
 
-2026-08-14T02:15:00Z
+2026-08-14T05:00:00Z

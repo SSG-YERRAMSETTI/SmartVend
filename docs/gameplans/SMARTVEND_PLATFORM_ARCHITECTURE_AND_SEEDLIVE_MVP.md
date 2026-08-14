@@ -200,8 +200,12 @@ Rules that already hold:
 - Money is fixed-precision decimal with an explicit currency, never float.
 - Timestamps are timezone-aware, stored UTC, and record both event time and
   ingestion time where they differ.
-- Every tenant-scoped table carries an indexed tenant column included in the
-  relevant unique constraints.
+- Ownership follows ADR-0002. "Tenant" is the concept, **Organization** is the
+  SmartVend representation, `org_id` is the persistence identity. Control-plane
+  **roots** carry explicit organization ownership; subordinate records may
+  inherit it through a mandatory parent relationship. The earlier blanket rule
+  requiring a tenant column on every table is superseded, having been
+  contradicted by the existing schema.
 - Every record originating externally carries its source system, source
   identifier, and the source artifact it came from.
 
@@ -227,14 +231,18 @@ ADR-0001; depends on schema authority (D1) and on expected customer count.
 
 **TARGET.** A crosswalk table maps external identity to SmartVend identity:
 
+Superseded in detail by **ADR-0002**; that ADR is authoritative for ownership
+and uniqueness. Shape:
+
 ```
 external_identity
-  tenant_id
+  org_id              ADR-0002: Organization is the tenant representation
   provider            e.g. vendsoft, cantaloupe, nayax
   entity_type         machine, product, location, device, selection
   external_id         the provider's identifier, as text
   smartvend_id        FK to the canonical entity
   connection_id       which connection observed it
+  mapping_state       UNRESOLVED | RESOLVED | AMBIGUOUS
   first_seen_at, last_seen_at
   confidence, mapping_method   deterministic, proposed, human-confirmed
 ```
@@ -242,7 +250,10 @@ external_identity
 Rules:
 
 - External identifiers are text, never coerced into a SmartVend key type.
-- Uniqueness is on `(tenant_id, provider, entity_type, external_id)`.
+- Initial uniqueness direction is `(connection_id, entity_type, external_id)`
+  per ADR-0002. The connection scope already carries organization and provider,
+  so one key covers both collision axes. Stated as a direction, not a settled
+  constraint: it has not been tested against a second provider.
 - The same physical machine may carry several external identities across
   providers, which is the normal case during migration plus live operation.
 - `productCode` and equivalent provider codes are explicitly not treated as
