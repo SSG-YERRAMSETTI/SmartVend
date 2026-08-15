@@ -146,6 +146,51 @@ Provider identity, artifact, connection, ingestion and parser fields are
 **excluded** from these entities by ADR-0003 D3e. They belong to the
 integration control plane.
 
+### 3.1a MVP control-plane model
+
+**TARGET MVP.** Provider-neutral domain contracts exist in
+`backend/integrations/` as dataclasses, enums and Protocols. **No persistence,
+no migration, no AWS.** Platform Task 2.
+
+```
+Organization                                     [CURRENT, canonical]
+ │
+ ├── IntegrationConnection      1:N   explicit org_id
+ │    │                               one org may hold several connections,
+ │    │                               including several to the same provider
+ │    ├── SourceArtifact        1:N   inherited via connection, org_id explicit
+ │    └── ExternalIdentity      1:N   inherited via connection, org_id explicit
+ │              │
+ │              └── canonical_entity_id ──> Location | Machine | Product |
+ │                                          Slot | VendTransaction |
+ │                                          VendTransactionLine
+ │                                          REFERENCE ONLY, never owned
+ │                                          Organization is NOT a target:
+ │                                          ownership comes from the connection
+ │
+ └── OnboardingRun              1:N   explicit org_id
+      └── OnboardingDataset     1:0..N
+           └── artifact_ids ──> SourceArtifact
+```
+
+| Concern | Rule |
+| --- | --- |
+| Organization | Resolved from SmartVend context or the resolved connection. **Never** from provider payload |
+| Credentials | Connection stores `credential_ref` only; no secret value, ever |
+| Provider config | Bounded `config` structure, not provider-specific tables |
+| External IDs | Unique by `(connection_id, entity_type, external_id)`; never a SmartVend primary key |
+| Mapping states | `UNRESOLVED`, `RESOLVED`, `AMBIGUOUS`. Unmapped states cannot carry a canonical id |
+| Provider vocabulary | Lives in `entity_type`/`external_id` **values**: terminal, coil, batch, AP code. Never columns, never tables |
+| Artifacts | Immutable; SHA-256 over exact raw bytes; sensitive headers dropped, not redacted |
+| Duplicate/replay | Scoped by `(org_id, connection_id, provider, payload_hash)`. Artifact equality is **not** provider or canonical transaction identity |
+| Run coverage | `discovered / processed / mapped / unresolved / failed`, with `COMPLETED_WITH_GAPS` decided from counters, not asserted |
+
+**DEFERRED POST-APPROVAL:** SQL persistence and migrations, S3 artifact
+storage, SQS, retry frameworks, connection health and backoff state, the
+Connector SDK, the Master Onboarding Orchestrator, and the full Migration
+Coverage Manifest. None of these are implemented, and this document does not
+claim otherwise.
+
 ### 3.2 Canonical entities deferred beyond MVP
 
 | Entity | Status |

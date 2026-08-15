@@ -272,6 +272,14 @@ Rules:
 
 ## 11. Integration connection model
 
+**Platform Task 2 status, 2026-08-15.** Sections 10 to 13 now exist as
+provider-neutral **domain contracts** in `backend/integrations/`:
+`IntegrationConnection` (`connections.py`), `ExternalIdentity`
+(`identities.py`), `RawReportArtifact` (`artifacts.py`), and `OnboardingRun`
+with `OnboardingDataset` (`onboarding.py`). Dataclasses, enums and Protocols
+with in-memory test doubles. **None of it is persisted** — no table, no
+migration, no S3, no SQS. The field lists below remain the target shape.
+
 **TARGET.**
 
 ```
@@ -423,6 +431,11 @@ force-mapped.
 linked to the original transaction, never as mutations of it. A refund arriving
 before or without its original is an expected, handled case. Financial
 reconciliation must account for adjustments explicitly.
+
+**MVP scope, ADR-0003 D3c.** "Their own records" means a separate
+`VendTransaction` with `transaction_type = REFUND` and an optional
+`original_transaction_id` — **not** a separate `Refund` entity, which the MVP
+deliberately does not have. Voids and chargebacks are beyond MVP.
 
 ## 21. Device to machine mapping
 

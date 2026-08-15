@@ -34,6 +34,51 @@ pushes to it.
 
 ## Current milestone
 
+### PLATFORM TASK 2 — control-plane models, 2026-08-15
+
+**"Define tenant isolation, external identity mapping, connection records,
+source artifacts, and onboarding run models."** Pre-approval MVP feasibility
+proof, not a production platform build.
+
+**Contracts only. Nothing is persisted:** no table, no migration, no S3, no
+SQS, no AWS. Dataclasses, enums and Protocols with in-memory test doubles.
+
+| Subtask | Model | State |
+| --- | --- | --- |
+| 1 | `IntegrationConnection` (`connections.py`) | Pre-existing, **approved unchanged** |
+| 2 | `ExternalIdentity` (`identities.py`) | **New** |
+| 3 | `RawReportArtifact` (`artifacts.py`) | Pre-existing, **approved unchanged** |
+| 4 | `OnboardingRun` / `OnboardingDataset` (`onboarding.py`) | **New** |
+
+**Two deliberate deviations from the requested MVP shape**, both to avoid
+churning tested, working code:
+
+1. `ConnectionStatus` keeps its five existing states — `PENDING`, `ACTIVE`,
+   `DEGRADED`, `FAILED`, `DISABLED` — rather than collapsing to
+   ACTIVE/INACTIVE/ERROR. These states are load-bearing in tested security
+   behavior via `accepts_inbound`: `DEGRADED` still accepts traffic because it
+   describes delivery health, not authorization, while `PENDING`, `FAILED` and
+   `DISABLED` reject. Collapsing them would delete tested semantics for no MVP
+   gain.
+2. `RawReportArtifact` keeps its existing field names. `payload_hash`,
+   `size_bytes`, `source_filename`, `storage_ref` and `transport_metadata` are
+   the requested `content_hash`, `byte_length`, `original_filename`,
+   `storage_reference` and `metadata`. Renaming would be churn across working
+   tests immediately after the `tenant_id` -> `org_id` rename.
+
+**Key rules now enforced by contract, not convention.** Organization is never
+derived from provider payload. Unmapped crosswalk states cannot carry a
+canonical id, so "half-resolved" is unrepresentable. Provider vocabulary lives
+in `entity_type` values, never in columns or provider-specific tables. Sensitive
+headers are dropped rather than redacted. `COMPLETED_WITH_GAPS` is decided from
+counters, so a caller cannot claim a clean run over unresolved records.
+
+**Deferred post-approval:** SQL persistence, migrations, S3, SQS, retry
+frameworks, connection health/backoff state, the Connector SDK, the Master
+Onboarding Orchestrator, and the full Migration Coverage Manifest.
+
+---
+
 ### CLICKUP TASK 1 — COMPLETE
 
 **"Finalize the SmartVend canonical data model and approve entity

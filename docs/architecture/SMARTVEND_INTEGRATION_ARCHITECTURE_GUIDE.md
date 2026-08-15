@@ -348,6 +348,14 @@ identity we depend on.
 
 ## 11. The external identity crosswalk
 
+**Status update, Platform Task 2, 2026-08-15.** The shape below is now a
+provider-neutral **domain contract** in `backend/integrations/identities.py`:
+`ExternalIdentity`, `MappingState`, `CanonicalEntityType`, and an
+`ExternalIdentityStore` Protocol. It is **not persisted** — no table, no
+migration. `entity_type` is deliberately free text so provider vocabulary
+(terminal, coil, batch, AP code) stays a *value* rather than becoming a column
+or a provider-specific table.
+
 **TARGET.** The generic shape:
 
 | Field | Purpose |
