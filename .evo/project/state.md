@@ -34,8 +34,54 @@ pushes to it.
 
 ## Current milestone
 
-ClickUp Task 1, MVP canonical business model, 2026-08-14. **Architecture and
-documentation only; no models, no schema, no migrations.**
+### CLICKUP TASK 1 — COMPLETE
+
+**"Finalize the SmartVend canonical data model and approve entity
+relationships." Closed 2026-08-15.**
+
+Task 1 was **architecture and model approval, not implementation.** No
+production model, schema, migration, repository, route, or write port was
+created, and the database implementation is **not** complete.
+
+| | |
+| --- | --- |
+| Audit checkpoint | 1A repository audit at `593c05ae` |
+| Decision record | `docs/architecture/ADR-0003-mvp-canonical-business-model.md` |
+| ER diagram | `SMARTVEND_TARGET_ARCHITECTURE.md` §3.1, deferred entities §3.2 |
+| Approval commit | `c8182d1b` |
+
+**Approved MVP canonical entity set:** Organization, User, Location, Product,
+Machine, Slot — all **unchanged, not redesigned** — plus the target
+`VendTransaction` and `VendTransactionLine`.
+
+**Major relationship decisions.** Organization is the concrete tenant and
+security root. Machine belongs to Organization explicitly; `Machine → Location`
+is optional; `Machine → Slot` is 1:N; `Slot → Product` is optional N:1 and one
+product may occupy many slots; `Slot.position` remains the machine-local
+selection concept. `VendTransaction` is the canonical header carrying
+`total_amount`, with `0..N` lines, so the monetary event survives missing line
+enrichment and no synthetic line is ever fabricated. SALE and REFUND are
+explicit `transaction_type` values; refunds never depend on negative quantity or
+price; `original_transaction_id` is optional; line sums may be reconciled
+against `total_amount` but never overwrite it.
+
+**Legacy and compatibility, deliberate.** The existing `sales` table stays
+**PRE-EXISTING COMPATIBILITY / LEGACY SALES FACT** — untouched, not deleted, not
+migrated. `Machine.external_code` and `Machine.telemetry_device_id` remain
+compatibility fields, and neither is treated as provider-verified identity.
+
+**Moved to later tasks.** Implementation of the two transaction entities,
+migrations, the canonical write port, and retiring the legacy `sales` path are
+implementation dependencies. `ExternalIdentity`, provenance, connection,
+artifact and ingestion-attempt persistence are **Task 2**. Cantaloupe
+selection-to-product resolution and the real HTTP-delivered report schema are
+**provider dependencies**. MVP debt is enumerated in ADR-0003.
+
+---
+
+Preceded by ClickUp Task 1 sub-checkpoints 1A/1B, MVP canonical business model,
+2026-08-14. **Architecture and documentation only; no models, no schema, no
+migrations.**
 
 `docs/architecture/ADR-0003-mvp-canonical-business-model.md` records the
 decisions; `SMARTVEND_TARGET_ARCHITECTURE.md` §3.1 carries the MVP ER diagram.

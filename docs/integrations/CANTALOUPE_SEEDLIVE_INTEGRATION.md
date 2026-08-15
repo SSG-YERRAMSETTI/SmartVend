@@ -282,6 +282,22 @@ Columns, in order:
 this evidence supports, so canonical design can proceed without waiting on the
 unresolved items.
 
+**This is the INTEGRATION / CONTROL-PLANE view of a delivered transaction, not
+the canonical business entity.** Written before ADR-0003; read it alongside
+that ADR, which is authoritative for the canonical model. Specifically:
+
+- The provider, connection, artifact, ingestion and idempotency fields below
+  are **control-plane** data. ADR-0003 D3e explicitly **excludes** them from
+  `VendTransaction` and `VendTransactionLine`.
+- The provider transaction, device and terminal identifiers resolve through the
+  `ExternalIdentity` crosswalk and **never** become canonical primary keys.
+- "signed amount, sign preserved" applies **at the provider boundary only**.
+  The canonical model stores positive magnitudes and carries SALE versus REFUND
+  meaning in `transaction_type`, never in the sign.
+- Canonically, this maps to one `VendTransaction` header plus `0..N`
+  `VendTransactionLine` records; the `Details` line-item collection below is
+  what would populate those lines when it can be parsed.
+
 | Field | Notes |
 | --- | --- |
 | SmartVend internal transaction ID | SmartVend-owned primary key |

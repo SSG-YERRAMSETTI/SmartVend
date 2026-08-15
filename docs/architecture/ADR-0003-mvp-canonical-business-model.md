@@ -317,9 +317,9 @@ No SQLAlchemy model changes, no `schema.sql` changes, no migrations, no FastAPI
 routes, no repositories, no integration persistence, no canonical write port, no
 frontend changes, no `sales` migration, and no Seed Live parsers.
 
-The canonical **write port** remains blocked per ADR-0002 D1b: no service or
-repository layer exists in the application to design one against, and that
-requires agreement with the application workstream owner.
+The canonical application **write port** is a later implementation dependency.
+ADR-0002 D1b defines the ownership and dependency direction, but the port itself
+has not yet been designed or implemented.
 
 ## Revisit if
 

@@ -628,7 +628,7 @@ here because provider access timing is unknown.
 | # | Decision | Blocks |
 | --- | --- | --- |
 | D1 | Which schema is authoritative, and when is Alembic initialized? | any schema change |
-| D2 | Tenant isolation model | canonical model |
+| D2 | ~~Tenant isolation model~~ **SETTLED** by ADR-0002 D1a and the Task 1 audit: shared schema, explicit `org_id` on roots, inherited ownership through a mandatory safe parent | nothing |
 | D3 | AWS adoption at MVP, and account and environment structure | queueing, storage, secrets |
 | D4 | SQS at MVP or a database-backed outbox first | P6 |
 | D5 | Minimum test and CI baseline before further feature work | all engineering |
