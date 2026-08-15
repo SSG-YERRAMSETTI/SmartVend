@@ -49,7 +49,7 @@ those hooks.
 | Live providers | None | Connector SDK with Cantaloupe first |
 | Raw evidence | None | Every payload preserved before parsing |
 | External identity | None | Crosswalk, no external IDs as primary keys |
-| Tenancy | Implicit, `org_id` present on the user model | Enforced at the data access boundary |
+| Tenancy | Shared schema; 24 tables carry explicit `org_id`, 12 inherit through a mandatory parent. Route handlers already enforce the join | Unchanged in shape; enforced consistently at the data access boundary |
 | Queueing | None | Outbox first, SQS when AWS is adopted |
 | Tests and CI | None | Required baseline before feature work |
 | Infrastructure | None | AWS, scope to be decided |
@@ -94,6 +94,70 @@ at-least-once live feed have different failure modes.
 
 Provider-neutral, owned by SmartVend. Domains listed in gameplan section 8.
 
+### 3.1 MVP canonical model
+
+**Accepted, ADR-0003.** The MVP business core. Deliberately excludes logistics
+and reporting tables, which are listed in 3.2.
+
+```
+Organization
+ ├── User                    1:N   org_id nullable for platform_admin only
+ ├── Location                1:N   required
+ ├── Product                 1:N   required
+ ├── Machine                 1:N   required
+ │    ├── Location           N:1   OPTIONAL, machine may be unplaced
+ │    └── Slot               1:N   required, CASCADE, UNIQUE(machine, position)
+ │         └── Product       N:1   OPTIONAL, unresolved selection allowed
+ └── VendTransaction         1:N   required
+      ├── Machine            N:1   required
+      ├── original_transaction  N:1    OPTIONAL, self-reference, refunds only
+      └── VendTransactionLine   1:0..N OPTIONAL, a transaction may have no lines
+           ├── Slot          N:1   OPTIONAL
+           └── Product       N:1   OPTIONAL
+```
+
+`VendTransaction` and `VendTransactionLine` are **TARGET and unimplemented**.
+
+`VendTransaction` carries `total_amount`, the transaction-level monetary
+magnitude, so a valid monetary event stays representable when line detail is
+missing, incomplete, or unavailable. Lines are therefore `0..N`, and **a
+synthetic "unknown" line is never fabricated to satisfy cardinality**.
+
+`transaction_type` is `SALE` or `REFUND`; a refund is typed, never signed.
+`total_amount`, `quantity` and `unit_price` are always positive, so net-revenue
+calculations must branch on `transaction_type` rather than rely on signed
+storage. Where lines exist, `sum(quantity * unit_price)` may be compared to
+`total_amount` as a reconciliation control, but line sums are **not**
+authoritative over the header — differences may reflect rounding, discounts,
+taxes, or incomplete extraction, and resolving them is reconciliation work, not
+Task 1.
+
+Ownership: `Organization`, `Location`, `Product`, `Machine` and
+`VendTransaction` carry explicit `org_id`. `Slot` inherits through `Machine`,
+`VendTransactionLine` through `VendTransaction`. Both inheritance paths are
+NOT NULL and non-reparentable, satisfying ADR-0002 D1a.
+
+Price layers, unchanged: `Product.sell_price` is catalog base,
+`Slot.price_override` is the configured selection price, `Slot.dex_price` is
+telemetry-observed and may drift, and `VendTransactionLine.unit_price` is the
+actual transacted value.
+
+Provider identity, artifact, connection, ingestion and parser fields are
+**excluded** from these entities by ADR-0003 D3e. They belong to the
+integration control plane.
+
+### 3.2 Canonical entities deferred beyond MVP
+
+| Entity | Status |
+| --- | --- |
+| `sales` | **Legacy compatibility fact**, ADR-0003 D3d. Live Supabase frontend consumer, no backend writer. Not deleted, not migrated, not modified. |
+| Route, Trip, RouteStop, RestockEntry | Working today, not required by the Seed Live path |
+| InventoryBatch, InventoryLedger, MachineInventory | Working today; representations overlap, normalization deferred |
+| Receipt, ReceiptLine, ProductSupplierPackaging, Expense, MileageLog | Working today, outside the MVP transaction core |
+| DailySalesSummary | Derived/reporting, no writer |
+| CommissionStatement, PriceList, PriceListItem, RefillOrder, InventoryTransfer, Ticket, Vehicle, Warehouse | Declared; several unused |
+| TelemetryEvent, Alert, AlertRule, Webhook, ApiKey, AuditLog | Operational support, unused |
+
 Binding rules:
 
 - Money is fixed-precision decimal with explicit currency. Never float.
@@ -114,9 +178,10 @@ Binding rules:
   ranges so historical events resolve against the binding in force at event
   time.
 
-DECISION NEEDED: the schema cannot be finalized until Seed Live payload evidence
-exists and schema authority is settled (gameplan D1). The database technology and
-access path are already fixed by ADR-0001.
+The **MVP** canonical business model is settled by ADR-0003, using verified
+Seed Live transaction-level evidence. The database technology and access path
+are fixed by ADR-0001. What is still open is the canonical surface beyond the
+MVP core and schema authority (gameplan D1).
 
 ## 4. Live provider framework
 
@@ -239,13 +304,19 @@ tenant. Cross-tenant access is an explicitly modeled, audited capability.
 
 Every tenant-scoped feature carries a negative test proving isolation.
 
-DECISION NEEDED: shared schema with tenant column, schema per tenant, or
-database per tenant.
+SETTLED: **shared schema with an organization column**, per ADR-0002 D1a and
+confirmed by the Task 1 audit. This was previously listed as a decision needed;
+it was already decided in the existing schema, which uses `org_id` on 24 tables
+and inherited ownership on 12 more. Schema-per-tenant and database-per-tenant
+are not under consideration.
 
 ## 15. What this document does not decide
 
-- The final canonical schema. Requires Seed Live evidence and schema authority,
-  gameplan D1.
+- The final canonical schema beyond the MVP core. The **MVP** business model is
+  settled by ADR-0003, section 3.1 above. What remains open is the non-MVP
+  surface and schema authority, gameplan D1.
+- How the legacy `sales` table is retired, populated, or migrated. ADR-0003 D3d
+  requires that decision before either representation is written.
 - Seed Live transport. Requires discovery.
 - Whether selection identity is stable across planogram changes. Requires
   discovery.

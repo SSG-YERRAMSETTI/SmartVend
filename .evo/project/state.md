@@ -34,8 +34,39 @@ pushes to it.
 
 ## Current milestone
 
-Ownership-field alignment, 2026-08-14. **Name-only rename; no behavior change,
-no persistence.**
+ClickUp Task 1, MVP canonical business model, 2026-08-14. **Architecture and
+documentation only; no models, no schema, no migrations.**
+
+`docs/architecture/ADR-0003-mvp-canonical-business-model.md` records the
+decisions; `SMARTVEND_TARGET_ARCHITECTURE.md` §3.1 carries the MVP ER diagram.
+
+**Approved unchanged:** Organization, User, Location, Machine, Product, Slot.
+`Machine.location_id` and `Slot.product_id` stay nullable, both already
+supported by working behavior.
+
+**Changed from the 1A proposal:** the existing `sales` table is **not** the
+canonical transaction model. It has zero backend readers or writers, is
+consumed only through the legacy Supabase path, holds one product per row with
+no header, models no refund, carries no external identity, and has no
+uniqueness constraint. Verified Seed Live evidence shows one provider
+transaction may carry multiple items. The target is two-level:
+**`VendTransaction` -> `VendTransactionLine`**, with `slot_id` and `product_id`
+nullable so an unresolved selection never causes a business event to be
+discarded. The header carries **`total_amount`**, and lines are **`0..N`**, so a
+monetary event stays representable when line detail is missing; a synthetic
+"unknown" line is never fabricated to satisfy cardinality. Refunds are
+`transaction_type = REFUND` with a positive `total_amount`, typed and never
+signed, so net revenue must branch on type rather than rely on sign. Where lines
+exist, their sum may be compared to `total_amount` as a control, but is not
+authoritative over the header.
+`sales` is classified legacy compatibility and is not deleted, migrated, or
+modified.
+
+**Not implemented, deliberately:** no SQLAlchemy or schema change, no
+migration, no routes, no repositories, no write port, no parsers.
+
+Preceded by the ownership-field alignment, 2026-08-14. **Name-only rename; no
+behavior change, no persistence.**
 
 **CURRENT:** the integration layer now uses **`org_id`** as the concrete
 SmartVend ownership identifier, on `IntegrationConnection`, on

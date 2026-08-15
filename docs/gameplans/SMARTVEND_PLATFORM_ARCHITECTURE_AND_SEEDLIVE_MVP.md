@@ -189,11 +189,21 @@ external identities, migration runs, migration datasets, source artifacts.
 The model is defined against the **target** architecture, FastAPI over
 PostgreSQL, per ADR-0001. The legacy Supabase path is not a design input.
 
-**DECISION NEEDED.** The schema is finalized from four evidence sources: the
+**PARTIALLY DECIDED.** The schema is finalized from four evidence sources: the
 existing SmartVend models, VendSoft extraction evidence, Seed Live payload
-evidence, and actual product requirements. Seed Live payload evidence does not
-exist yet, and schema authority is still open as D1. Finalizing before that
-evidence arrives would be invention. Neither dependency is Supabase.
+evidence, and actual product requirements.
+
+The **MVP business core is now settled by ADR-0003**: Organization, User,
+Location, Machine, Product, Slot, and the two-level
+`VendTransaction`/`VendTransactionLine` model. It rests on the repository audit
+at `593c05ae` and on verified Seed Live transaction-level evidence
+(`CANTALOUPE_SEEDLIVE_INTEGRATION.md` §1B), including that one provider
+transaction may carry multiple item entries.
+
+**Still open:** the canonical surface beyond that MVP core, and schema
+authority, which remains D1. Selection-to-product resolution is still NOT
+VERIFIED (§1C), which is why `VendTransactionLine.product_id` and `slot_id` are
+nullable rather than required. Neither dependency is Supabase.
 
 Rules that already hold:
 

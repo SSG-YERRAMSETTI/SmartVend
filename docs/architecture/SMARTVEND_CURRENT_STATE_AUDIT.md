@@ -83,6 +83,13 @@ Components importing it directly: `AuditLogDrawer`, `CSVImportDialog`,
 So core operational domains, machines, locations, inventory, sales, routes and
 telemetry, currently bypass the backend entirely.
 
+**Sales is a stronger case than "bypasses the backend."** The Task 1 audit at
+`593c05ae` found the `sales` table has **no writer at all**, in either path: the
+ORM `Sale` model has zero references outside `models.py`, and `ops_routes.py`
+states that revenue "will correctly show $0" until vend transactions are
+recorded somewhere. `useSales.tsx` reads `sales` from Supabase, so the read path
+is live but the data is not being produced. See ADR-0003 D3d.
+
 ### 3.2 Authentication
 
 PARTIALLY VERIFIED. Authentication itself has moved to the backend, but

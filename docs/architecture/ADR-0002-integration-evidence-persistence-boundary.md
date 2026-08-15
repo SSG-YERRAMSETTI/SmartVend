@@ -23,10 +23,12 @@ force these decisions:
 
 - The database has an `organizations` table and 24 `org_id` columns. There is
   **no** `tenant_id` column anywhere and no separate tenant entity.
-- 13 of 37 tables carry no organization column at all, including `slots`,
-  `telemetry_events`, `machine_inventory`, `daily_sales_summary`,
-  `cash_collections`, and `receipt_lines`. Ownership is inherited through a
-  mandatory parent.
+- Of the 37 ORM models, 13 carry no organization column. One of those is
+  `organizations` itself, the root, so **12 subordinate tables genuinely inherit
+  ownership** through a mandatory parent, including `slots`, `telemetry_events`,
+  `machine_inventory`, `daily_sales_summary`, `cash_collections`, and
+  `receipt_lines`. (`schema.sql` defines 38 tables; `api_rate_limits` has no ORM
+  model. Precision added by the Task 1 audit at `593c05ae`.)
 - There is **no** repository, service, port, or unit-of-work abstraction
   anywhere in `backend/`. Fourteen modules use the database session directly,
   and route handlers call `db.add()` and `db.commit()` inline.
