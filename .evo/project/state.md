@@ -34,6 +34,48 @@ pushes to it.
 
 ## Current milestone
 
+### PLATFORM TASK 6 — raw preservation + schema identification, 2026-08-15
+
+**"Implement raw payload preservation and report version handling."**
+Identification only. **No parsing** — that is Task 7.
+
+**6.1 raw preservation: already satisfied, nothing rebuilt.** The Task 2
+`RawReportArtifact` contract, exercised through the registered route in Task 5,
+already provides and tests byte-exact preservation, SHA-256 over exact bytes,
+`org_id` from the resolved connection, retained connection/provider/timestamp/
+size, sanitized metadata with `Authorization` dropped, deterministic replay, and
+preservation independent of parser success.
+
+**6.2 schema identification: implemented** in
+`backend/integrations/cantaloupe/schemas.py`. Report type
+`transactions_in_payment` or `unknown`; schema id
+`seedlive_transactions_in_payment_csv_v1` or `unknown`.
+
+**`v1` is SmartVend's contract version, not Cantaloupe's.** The provider
+publishes no version for this schema. `ReportIdentification.report_version`
+stays reserved for a provider-declared version and remains `None`.
+
+Detection requires the **exact 16 columns in the exact observed order**, read
+from the header line only. Reordered, renamed, missing or extra columns return
+`unknown` deliberately: a partial match is where a parser reads the wrong
+column. Verified against the **real 345,319-byte export**, not just a synthetic
+header. Filename alone cannot cause recognition, a hint alone cannot establish a
+schema, and payload structure outranks a contradictory hint.
+
+**Unknown handling:** preserved byte-exact, typed `unknown`, never parsed,
+nothing guessed, nothing discarded.
+
+**`PARSABLE_SCHEMAS` is deliberately empty** and `parse()` still raises
+`ReportParsingNotVerified` even for a recognised schema, so "recognised" and
+"parsable" cannot be conflated.
+
+**Still externally unverified, unchanged:** generated report filename,
+`Content-Type`, compression/ZIP framing, HTTP-carried schema metadata, and any
+provider-owned version. Task 6 is an internal identification contract for the
+authentic historical schema we possess, not a provider contract.
+
+---
+
 ### PLATFORM TASK 5 — inbound endpoint registered, 2026-08-15
 
 **"Build the SmartVend inbound endpoint for Seed Live reports."** Proves **entry

@@ -1069,3 +1069,102 @@ validated once account access exists.
 6. **Timezone semantics** for the `Date` column.
 
 None blocks starting MVP implementation. All block *completing* it.
+
+---
+
+# 15. Platform Task 6: raw preservation and schema identification
+
+**2026-08-15.** Adds the minimum identification needed to tell a payload we can
+read from one we cannot, without guessing.
+
+## 15.1 Raw payload preservation — CURRENT, already satisfied
+
+No preservation code was written for Task 6. The `RawReportArtifact` contract
+from Task 2, exercised end to end through the registered route in Task 5,
+already provides and tests every requirement: byte-exact preservation, SHA-256
+over exact bytes, `org_id` from the resolved connection, retained
+`connection_id`, `provider`, `received_at` and `size_bytes`, sanitized transport
+metadata with `Authorization` and other sensitive headers **dropped rather than
+redacted**, representable `source_filename` and `storage_ref`, deterministic
+replay identity, binary and non-UTF-8 payloads accepted, and preservation that
+does not depend on parser success.
+
+## 15.2 Schema identification — TARGET MVP, implemented
+
+`backend/integrations/cantaloupe/schemas.py`.
+
+| Concept | Value |
+| --- | --- |
+| Report type | `transactions_in_payment`, or `unknown` |
+| Schema identifier | `seedlive_transactions_in_payment_csv_v1`, or `unknown` |
+| Parsable schemas | **empty set** — recognising a layout is not parsing it |
+
+**What `v1` means.** It is **SmartVend's** contract version for the layout we
+observed. **Cantaloupe does not call this schema v1 and has published no version
+for it.** The suffix versions our own understanding so a future layout can
+become `_v2` without redefining what v1 meant. `ReportIdentification.report_version`
+stays reserved for a version the *provider* declares and remains `None`, because
+none has ever been observed.
+
+**Detection rule.** Read the first line, decode as `utf-8-sig` so the BOM the
+real export carries is not absorbed into the first column name, parse it as CSV,
+normalize each column by casefolding and collapsing whitespace, and require the
+**exact 16 columns in the exact observed order**:
+
+`Reference #`, `Reconcile Group`, `Trans Type`, `Settle State`, `Tran #`,
+`Device`, `Terminal`, `Location`, `Asset #`, `Client`, `Date`, `Card Type`,
+`Amount`, `AP Code`, `Details`, `Batch #`
+
+Anything else is `unknown`. Reordered, renamed, missing or extra columns all
+return unknown deliberately: a partial match is precisely where a parser reads
+the wrong column, and an unparsed artifact is recoverable while misparsed data
+is not.
+
+**Verified against the authentic evidence**: the detector identifies the real
+345,319-byte `Transactions in Payment` export, not merely a synthetic header.
+
+**Safety properties, each tested.** Identification never reads data values, so
+it cannot depend on customer-specific identifiers. The **filename alone cannot
+cause recognition** — a caller controls it, so treating it as proof of schema
+would let a delivery name itself into a parser. A **hint alone cannot establish
+a schema**: it may name a report type, but the result stays unconfident with
+`schema_id` unknown. **Payload structure outranks a contradictory hint**, since
+the header is evidence the payload carries about itself. Identification never
+mutates the payload and never raises; malformed, binary and non-UTF-8 input all
+return unknown.
+
+## 15.3 Unknown handling
+
+```
+raw artifact
+    |
+ preserved first
+    |
+ identify schema
+    |-- known   -> report type + schema id, eligible for a future parser
+    \-- unknown -> preserved intact, not parsed, nothing guessed
+```
+
+An unrecognised payload is preserved byte-exact and marked
+`report_type = unknown`. Nothing is discarded, no report type is fabricated, and
+the known parser is never run against unknown data.
+
+## 15.4 What Task 6 does NOT establish — UNKNOWN, unchanged
+
+Identification operates on payload bytes we already hold. It says nothing about
+the real generated HTTP delivery, all of which remains externally unverified:
+generated report **filename** behavior, **Content-Type**, **compression or ZIP**
+framing, schema or version metadata carried over HTTP, report type communicated
+via URL, query or header, and any **provider-owned schema version**.
+
+This is an **internal SmartVend identification contract for the authentic
+historical schema we possess**, which is sufficient for the MVP feasibility
+proof and is not a provider contract.
+
+## 15.5 Deferred
+
+A full report registry and version management, identification for the other five
+Report Register types, and parsing of any kind. `PARSABLE_SCHEMAS` is
+deliberately empty and `parse()` still raises `ReportParsingNotVerified` even for
+a recognised schema, so "recognised" and "parsable" can never be silently
+conflated. Turning rows into `VendTransaction` records is **Task 7**.

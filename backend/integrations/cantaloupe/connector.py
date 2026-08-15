@@ -11,8 +11,16 @@ schema has been captured from a real delivery.
 from __future__ import annotations
 
 from integrations.artifacts import UNKNOWN_REPORT_TYPE
+from integrations.cantaloupe.schemas import (
+    SCHEMA_REPORT_TYPES,
+    identify_schema,
+)
 from integrations.connections import IntegrationConnection
-from integrations.connector import ReportIdentification, ReportParsingNotVerified
+from integrations.connector import (
+    UNKNOWN_SCHEMA,
+    ReportIdentification,
+    ReportParsingNotVerified,
+)
 from integrations.inbound import InboundReportRequest
 from integrations.providers import Provider
 
@@ -77,17 +85,25 @@ class CantaloupeConnector:
     ) -> ReportIdentification:
         """Identify a delivery as far as the evidence allows.
 
-        Today this always returns unknown for a real Seed Live delivery,
-        because no verified source of a report type exists: the HTTP adapter
-        supplies no hint, and content sniffing is deliberately not attempted
-        since a CSV header guess would be an invented schema.
+        Order matters. **Payload structure outranks any hint**, because the
+        header is evidence the payload carries about itself, while a hint is
+        something a caller asserts. A recognised layout is therefore the only
+        identification marked confident.
 
-        When a hint is present it is mapped against the verified Report
-        Register names, and the result is always marked unconfident. A hint is
-        corroborating evidence, never truth.
+        If the layout is unrecognised we fall back to the hint, which can name
+        a report type but can never establish a schema. Such a result stays
+        unconfident with `schema_id` UNKNOWN, so it can never select a parser.
 
         Never raises. An unidentified payload is still preserved.
         """
+        schema_id = identify_schema(request.payload)
+        if schema_id != UNKNOWN_SCHEMA:
+            return ReportIdentification(
+                report_type=SCHEMA_REPORT_TYPES[schema_id],
+                schema_id=schema_id,
+                confident=True,
+            )
+
         hint = request.report_type_hint
         if hint:
             normalised = _normalise(hint)
@@ -105,10 +121,12 @@ class CantaloupeConnector:
         identification: ReportIdentification,
         connection: IntegrationConnection,
     ) -> object:
-        """Not implemented. No Seed Live report schema has been verified.
+        """Not implemented. Recognising a layout is not being able to parse it.
 
-        Always raises `ReportParsingNotVerified`. Writing a parser against an
-        assumed CSV or JSON shape would silently produce wrong canonical data.
+        Always raises `ReportParsingNotVerified`, including for a recognised
+        schema. Identification (Task 6) establishes *what* an artifact is;
+        turning rows into canonical records is Task 7 and is deliberately not
+        started. `PARSABLE_SCHEMAS` is empty for exactly this reason.
         """
         raise ReportParsingNotVerified(
             self.provider.value, identification.report_type

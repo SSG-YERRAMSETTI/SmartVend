@@ -17,6 +17,11 @@ from integrations.connections import IntegrationConnection
 from integrations.inbound import InboundReportRequest
 from integrations.providers import Provider
 
+#: Recorded when a payload matches no layout SmartVend recognises. Lives in the
+#: provider-neutral layer so every connector shares one sentinel; the concrete
+#: schema identifiers belong to each provider's own package.
+UNKNOWN_SCHEMA = "unknown"
+
 
 @dataclass(frozen=True)
 class ReportIdentification:
@@ -26,15 +31,32 @@ class ReportIdentification:
     transport-declared name that we cannot yet corroborate. An unconfident
     identification is still recorded, and still preserved, but must not be used
     to select a parser.
+
+    `schema_id` is **SmartVend's** identifier for a payload layout we have
+    actually observed and know how to read. It is our contract version, not a
+    provider-published one. `report_version` stays reserved for a version the
+    *provider* declares, and is None because no provider version has ever been
+    observed; the two must not be conflated.
     """
 
     report_type: str = UNKNOWN_REPORT_TYPE
     report_version: str | None = None
     confident: bool = False
+    schema_id: str = UNKNOWN_SCHEMA
 
     @property
     def is_known(self) -> bool:
         return self.report_type != UNKNOWN_REPORT_TYPE
+
+    @property
+    def has_known_schema(self) -> bool:
+        """Whether the payload layout is one we recognise.
+
+        Distinct from `is_known`: a report type can be named by a hint while
+        its layout is still unrecognised, and only a recognised layout may
+        ever select a parser.
+        """
+        return self.schema_id != UNKNOWN_SCHEMA
 
 
 class ReportParsingNotVerified(NotImplementedError):
