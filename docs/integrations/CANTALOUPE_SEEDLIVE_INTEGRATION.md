@@ -858,6 +858,34 @@ Only after step 10 may authentication, parsers, and mappings be implemented.
 
 ## 12. Requirements before route registration
 
+**Superseded in part by Platform Task 5, 2026-08-15.** The route **is now
+registered** in `main.py` for the pre-approval MVP feasibility proof, before all
+five conditions below are met. The conditions were written assuming the route
+would only ever be registered when production-ready; the MVP proof needs the
+route reachable inside SmartVend to demonstrate entry into the system.
+
+Registration is safe because the route **fails closed**. Connection resolution,
+the artifact store and credential resolution all still raise `503`, so an
+unconfigured deployment accepts nothing and reveals nothing. The gate the
+conditions really protect — never acknowledging a delivery we cannot preserve —
+is enforced by that fail-closed behavior rather than by absence of registration.
+
+Status against each original condition:
+
+| # | Condition | Status |
+| --- | --- | --- |
+| 1 | Verified inbound authenticator | **Partial.** HTTP Basic verified for Test Transport; generated-report authentication NOT VERIFIED |
+| 2 | Enumeration normalization reviewed against real provider behavior | **Not met.** Requires a real delivery |
+| 3 | Status codes confirmed against real provider | **Not met.** Requires a real delivery |
+| 4 | Artifact and connection persistence exists | **Not met.** Enforced instead by failing closed |
+| 5 | Size limit set from observed report sizes | **Not met.** 25 MB remains a guess |
+
+**Conditions 1 to 3 and 5 must still be satisfied before this endpoint carries
+production traffic.** Registration proves the path exists; it does not declare
+the integration production-ready.
+
+The original conditions, retained:
+
 The router must not be registered in `main.py` until all of the following hold.
 
 1. A verified inbound authenticator exists, implemented from evidence, not
@@ -883,7 +911,7 @@ The router must not be registered in `main.py` until all of the following hold.
 | Idempotency key derivation | Implemented, tested |
 | Connector boundary | Implemented |
 | Cantaloupe connector | Identification only, parsing refuses |
-| Inbound route | Implemented, **not registered**. Returns 200 for accepted and for replay; all pre-authentication rejections normalized |
+| Inbound route | Implemented and **registered** in `main.py` as of Platform Task 5. **Fails closed**: all three persistence dependencies raise 503 until a durable implementation exists. Returns 200 for accepted and for replay; all pre-authentication rejections normalized |
 | Report identification from a delivery | **Not implemented.** No verified source exists, so the adapter supplies no hint |
 | Authentication | **HTTP Basic implemented and tested offline.** Real generated-report authentication remains NOT VERIFIED |
 | Credential resolution | Contract only. No secret store wired; AWS Secrets Manager deferred |

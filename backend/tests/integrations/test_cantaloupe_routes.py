@@ -79,19 +79,37 @@ def build_client(
 
 
 class TestRouteRegistration:
-    """The endpoint must not be live until authentication is verified.
+    """The endpoint is registered as of Platform Task 5, and fails closed.
 
     Checked by reading main.py rather than importing it: the application module
-    raises at import time without DATABASE_URL, and this property is a source
-    fact that does not need a running app to verify.
+    raises at import time without DATABASE_URL, and these are source facts that
+    do not need a running app. `test_app_inbound_route.py` exercises the live
+    application itself.
     """
 
-    def test_router_is_not_registered_in_the_application(self) -> None:
+    def test_router_is_registered_in_the_application(self) -> None:
         main_source = (BACKEND_DIR / "main.py").read_text(encoding="utf-8")
-        assert "cantaloupe" not in main_source.lower(), (
-            "The Cantaloupe router appears to be registered in main.py. It must "
-            "stay unregistered until a verified inbound authenticator exists."
-        )
+        assert "cantaloupe_router" in main_source
+
+    def test_no_default_persistence_is_wired(self) -> None:
+        """Registration must not come with an in-memory default store.
+
+        Acknowledging a real delivery and then losing it on restart is worse
+        than refusing it, so every persistence dependency stays fail-closed
+        until a durable implementation exists.
+        """
+        source = (
+            BACKEND_DIR / "integrations" / "cantaloupe" / "routes.py"
+        ).read_text(encoding="utf-8")
+        for provider in (
+            "def get_connection_resolver",
+            "def get_artifact_store",
+            "def get_credential_provider",
+        ):
+            body = source.split(provider, 1)[1].split("\ndef ", 1)[0]
+            assert "HTTP_503_SERVICE_UNAVAILABLE" in body, (
+                f"{provider} must fail closed until durable persistence exists"
+            )
 
     def test_route_path_is_provider_specific(self) -> None:
         paths = {r.path for r in routes.router.routes}

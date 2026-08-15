@@ -34,6 +34,35 @@ pushes to it.
 
 ## Current milestone
 
+### PLATFORM TASK 5 — inbound endpoint registered, 2026-08-15
+
+**"Build the SmartVend inbound endpoint for Seed Live reports."** Proves **entry
+into SmartVend** only. No parsing, no mapping, no persistence, no AWS.
+
+`POST /integrations/cantaloupe/{connection_id}/reports` is now **registered in
+`backend/main.py`**. The chain is proven end to end against the real application:
+resolve connection -> derive `org_id` from it -> authenticate -> receive exact
+bytes -> preserve artifact -> detect replay -> return an accepted response.
+
+**It fails closed.** `get_connection_resolver`, `get_artifact_store` and
+`get_credential_provider` all still raise 503, so an unconfigured deployment
+accepts nothing. No in-memory default was wired: acknowledging a real delivery
+and then losing it on restart is worse than refusing it, and durable persistence
+would need a migration, which is out of scope. A guard test asserts all three
+stay fail-closed.
+
+This **partly supersedes** `CANTALOUPE_SEEDLIVE_INTEGRATION.md` §12, which said
+the route must not be registered until five conditions held. Conditions 1-3 and
+5 are still unmet and **must be satisfied before production traffic**;
+condition 4 is enforced by failing closed instead. Registration proves the path
+exists; it does not declare the integration production-ready.
+
+Task 5 tests run against the `app` object from `main.py`, not a standalone test
+app, with throwaway `DATABASE_URL`/`JWT_SECRET` so the module imports without
+touching a database.
+
+---
+
 ### PLATFORM TASK 3 — Seed Live feasibility: **FEASIBLE**, 2026-08-15
 
 **"Own the Cantaloupe / Seed Live investigation and integration."** Pre-approval

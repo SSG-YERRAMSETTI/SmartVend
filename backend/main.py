@@ -31,6 +31,7 @@ from machine_extras_routes import router as machine_extras_router
 from ops_routes import router as ops_router
 from purchases_routes import router as purchases_router
 from assistant_routes import router as assistant_router
+from integrations.cantaloupe.routes import router as cantaloupe_router
 
 load_dotenv()
 
@@ -43,6 +44,17 @@ app.include_router(machine_extras_router)
 app.include_router(ops_router)
 app.include_router(purchases_router)
 app.include_router(assistant_router)
+
+# Seed Live / Cantaloupe inbound reports. Registered for the MVP feasibility
+# proof: POST /integrations/cantaloupe/{connection_id}/reports.
+#
+# It FAILS CLOSED. Connection resolution, the artifact store, and credential
+# resolution have no persistent implementation yet, so every dependency raises
+# 503 until one is configured. That is deliberate: an in-memory default would
+# acknowledge real provider deliveries and then lose them on restart, which is
+# worse than refusing them. Tests override these dependencies to exercise the
+# full path against this same application.
+app.include_router(cantaloupe_router)
 
 
 class WarehouseInventoryItem(BaseModel):
