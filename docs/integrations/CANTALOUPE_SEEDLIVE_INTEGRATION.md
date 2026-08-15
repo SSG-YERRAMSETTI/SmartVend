@@ -1168,3 +1168,126 @@ Report Register types, and parsing of any kind. `PARSABLE_SCHEMAS` is
 deliberately empty and `parse()` still raises `ReportParsingNotVerified` even for
 a recognised schema, so "recognised" and "parsable" can never be silently
 conflated. Turning rows into `VendTransaction` records is **Task 7**.
+
+---
+
+# 16. Platform Tasks 7 + 8 + 9: the Seed Live data-side proof
+
+**2026-08-15.** Parsing, device mapping, and selection mapping, proven against
+the authentic 1,586-row export. Canonical transformation only: **nothing is
+written**, per ADR-0002 D1b.
+
+## 16.1 Trans Type classification — VERIFIED from the export
+
+All seven values, with their real counts:
+
+| Provider `Trans Type` | Rows | Canonical | `payment_method` |
+| --- | --- | --- | --- |
+| `Credit (Apple Pay EMV)` | 726 | SALE | cashless |
+| `Credit (EMV Contactless)` | 444 | SALE | cashless |
+| `Cash` | 288 | SALE | cash |
+| `Credit (Apple Pay Cash EMV)` | 76 | SALE | cashless |
+| `Credit` | 43 | SALE | cashless |
+| `Credit (Google Pay EMV)` | 8 | SALE | cashless |
+| `Refund` | 1 | REFUND | — |
+
+**Anything not on this list is `UNSUPPORTED`**, reported and never converted.
+The classification is an **allowlist, not a default**: a future adjustment,
+chargeback or test event must not silently inflate revenue. `Settle State` is
+`Processed` for all Cash and `Settled` for everything else.
+
+## 16.2 Money, sign and time
+
+`Amount` is always `$N.NN`, and `-$N.NN` for the single refund. The refund is
+typed **and** signed, so ADR-0003 D3c is applied exactly: canonical meaning
+comes from `transaction_type` and `total_amount` is stored as a **positive
+magnitude**. An unparsable amount raises rather than defaulting — a silently
+zeroed amount is a wrong financial record that looks real.
+
+`Date` is `MM/DD/YYYY HH:MM:SS AM|PM` with **no timezone on any of the 1,586
+rows**. The parsed value is deliberately naive, `timezone_known` is False, and
+the raw string is retained, so nothing downstream can mistake it for UTC.
+
+## 16.3 `Details` is the line breakdown — NEW, VERIFIED
+
+Measured, not assumed:
+
+- Every component matches `CODE($N.NN)` or `CODE(N * $N.NN)`. **2,730
+  components parsed, zero failures.**
+- **134 distinct four-character codes**, every one exactly four characters.
+- **One constant 16-character alphabetic label**, on 1,069 rows — a fee or
+  surcharge line, **not** a vended line item, and never mapped as one.
+- Component amounts sum to the transaction `Amount` on **1,585 of 1,586** rows,
+  zero mismatches; the one exception has an empty `Details`.
+
+**Full accounting, with nothing unexplained:**
+
+| Case | Rows | Result |
+| --- | --- | --- |
+| No fee component | 516 | Lines reconcile to the header **exactly**, 516/516 |
+| With fee component | 1,069 | `total_amount − lines_total` **equals the fee exactly**, 1,069/1,069 |
+
+This is precisely the case ADR-0003 D3b anticipated when it refused to let line
+sums overwrite the header: the difference is a fee, it is reported, and it is
+never auto-corrected.
+
+**Still NOT VERIFIED:** that the four-character codes are Seed Live "Coil Name"
+values, selection identifiers, or map to any product or slot (§1C). They are
+treated as opaque provider line item identifiers.
+
+## 16.4 Device to Machine — Task 8
+
+`Device` is chosen as the machine identity: 12 distinct values, shape
+`AA000000000`. `Terminal` (12 distinct, shape `A00000000`) was exactly 1:1 with
+`Device` **within this one export**, which does **not** prove they are globally
+interchangeable, so only one is used and the other is retained as evidence.
+
+Resolution runs through the Task 2 crosswalk as
+`entity_type="device" → CanonicalEntityType.MACHINE`. A provider identifier
+never becomes `Machine.id`. `Machine.telemetry_device_id` and
+`Machine.external_code` are **not** repurposed as the crosswalk — a guard test
+asserts neither name appears in the mapping modules.
+
+## 16.5 Line item code to Slot / Product — Task 9
+
+**Naming, deliberately conservative.** The four-character codes are called
+**line item codes**, with `entity_type = "line_item_code"`. The financial
+reconciliation in §16.3 proves they identify the items making up a transaction.
+It does **not** prove they are Seed Live Coil Names, selection identifiers, or
+planogram positions, so the code does not say "selection" anywhere except to
+disclaim it.
+
+They resolve through `entity_type="line_item_code" → CanonicalEntityType.SLOT`
+and are **UNRESOLVED for every code**. The canonical target kind records where
+such a mapping *would* land if evidence later supports it; while every entry is
+UNRESOLVED, no such claim is being made.
+
+The proof that matters: **unresolved enrichment is not a lost transaction.** A
+line is still created with quantity and unit price; `slot_id` and `product_id`
+stay None. No "Unknown Product", no synthetic slot, no fabricated line. `AP Code`
+is never treated as a line item code, per §14.3.
+
+## 16.6 Full-export result
+
+Running the whole pipeline over the authentic file:
+
+| Measure | Result |
+| --- | --- |
+| Records parsed | **1,586 of 1,586**, zero failures |
+| Canonical drafts | 1,586 — 1,585 SALE, 1 REFUND |
+| Unsupported events | 0 (all seven observed types classified) |
+| All amounts positive | **Yes** |
+| Device crosswalk entries | 12, all UNRESOLVED |
+| Line item code crosswalk entries | 134, all UNRESOLVED |
+| Machines resolved | 0 of 1,586 — no mappings exist yet, and none were invented |
+
+Zero resolved machines is the **correct** result with an empty crosswalk. It
+demonstrates the property that matters: 1,586 transactions survive with full
+monetary fidelity while every identity mapping is still outstanding.
+
+## 16.7 Deferred
+
+The Transaction Line Item report (no authentic evidence), the other five report
+types, VendSoft migration, reconciliation, persistence, and the application write
+port. Line item code to product or slot resolution remains blocked on provider
+access (§14.6).

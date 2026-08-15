@@ -34,6 +34,57 @@ pushes to it.
 
 ## Current milestone
 
+### PLATFORM TASKS 7+8+9 — Seed Live data-side proof, 2026-08-15
+
+**Parse, map device, map selection.** Canonical **transformation only** — no
+canonical record is written, per ADR-0002 D1b. No persistence, no migration, no
+AWS. Details in `CANTALOUPE_SEEDLIVE_INTEGRATION.md` §16.
+
+**Proven against the real 1,586-row export:** 1,586 records parsed with zero
+failures, 1,585 SALE + 1 REFUND, zero unsupported, every canonical amount
+positive, 12 device and 134 line item code crosswalk entries, all UNRESOLVED.
+
+**Trans Type is an allowlist, never a default.** Six observed values map to
+SALE (`Cash` -> cash; five `Credit*` variants -> cashless), `Refund` maps to
+REFUND, and **anything unobserved is UNSUPPORTED** — reported, never converted.
+A future chargeback or adjustment cannot silently inflate revenue.
+
+**Refunds confirm ADR-0003 D3c.** The provider types *and* signs the refund;
+canonical meaning is taken from the type and `total_amount` is stored as a
+positive magnitude.
+
+**`Details` is the line breakdown — new finding.** All 2,730 components parse as
+`CODE($N.NN)` or `CODE(N * $N.NN)`. 134 distinct four-character codes, plus
+**one constant 16-character fee label that is never mapped as a line item**.
+Accounting is complete with nothing unexplained: 516/516 no-fee rows reconcile
+exactly, and on all 1,069 fee rows `total_amount - lines_total` equals the fee
+exactly. This is the case ADR-0003 D3b anticipated when it refused to let line
+sums overwrite the header.
+
+**Time:** no row carries a timezone, so the parsed value stays naive,
+`timezone_known` is False, and the raw string is retained. Nothing converts to
+UTC without evidence.
+
+**Device -> Machine:** `Device` chosen as machine identity. `Terminal` was 1:1
+with it *within this one export*, which does not prove global
+interchangeability, so only one is used. Provider identifiers never become
+`Machine.id`, and `telemetry_device_id`/`external_code` are **not** repurposed
+as the crosswalk (guard test).
+
+**Line item code -> Slot/Product: UNRESOLVED for every code**, which is the
+correct MVP outcome. The codes are named `line_item_code`, not "selection": the
+reconciliation proves they identify transaction items, **not** that they are
+Coil Names, selection identifiers, or planogram positions.
+
+The proof that matters is that unresolved enrichment does not lose the
+transaction: lines carry quantity and unit price with `slot_id` and `product_id`
+None. No "Unknown Product", no synthetic slot, no fabricated line.
+
+**Still blocked on provider access:** line item code to product or slot
+resolution, and the real generated HTTP report envelope.
+
+---
+
 ### PLATFORM TASK 6 — raw preservation + schema identification, 2026-08-15
 
 **"Implement raw payload preservation and report version handling."**
