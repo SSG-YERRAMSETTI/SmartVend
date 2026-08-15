@@ -891,3 +891,153 @@ The router must not be registered in `main.py` until all of the following hold.
 | Device and selection mapping | Not implemented, by design |
 | Queueing, S3, SQS, Bedrock | Not implemented, out of milestone scope |
 | Persistence schema | Not created. Requires coordination with the application consolidation workstream |
+
+---
+
+# 14. Platform Task 3 closure: feasibility investigation
+
+**Closed 2026-08-15** at commit `39ca5107`. This section closes the Seed Live
+investigation for the **pre-approval MVP feasibility proof**. It records
+evidence and a decision. It is deliberately **not** the provider contract
+catalogue, which is Platform Task 4.
+
+No new experiment was run. The Cloudflare tunnel and `scripts/seedlive_capture.py`
+remained **shut down** throughout: every Test Transport question they could
+answer is already answered, and re-exposing a public listener to repeat a proven
+result would be gratuitous exposure.
+
+## 14.1 Capture inventory, revalidated from disk
+
+`data/seedlive/captures/` holds **10 captures**, gitignored and never committed.
+Re-derived from the stored request records rather than from prior summaries:
+
+| Origin | Count | Path | Query | Bytes | Distinct bodies |
+| --- | --- | --- | --- | --- | --- |
+| Seed Live Test Transport | **8** | `/seedlive/discovery/run1/testTransportFileName` | `reason=TEST` | 33 | **1**, byte-identical |
+| Our own PowerShell preflights | 2 | `/seedlive/discovery/preflight`, `/auth-preflight` | none | 14 | 2 |
+
+All 8 Seed Live deliveries share one SHA-256. Seed Live's client identifies as
+`Apache-HttpClient/4.5.14 (Java/17.0.19)` over HTTP/1.1, sends
+`Accept: text/plain`, and carries New Relic distributed-tracing headers.
+**Zero real generated reports have ever been received.**
+
+## 14.2 Evidence matrix
+
+| Question | Status | Basis |
+| --- | --- | --- |
+| HTTP transport availability | **VERIFIED** | 8 real deliveries received |
+| POST method | **VERIFIED** | All 10 captures are POST |
+| Path behavior | **VERIFIED FOR TEST TRANSPORT** | Configured path with `/testTransportFileName` appended |
+| Query behavior | **VERIFIED FOR TEST TRANSPORT** | `reason=TEST` |
+| Basic Auth behavior | **VERIFIED** | Authorization present only when credentials configured; absent when blank |
+| Body transport | **VERIFIED FOR TEST TRANSPORT** | 33 bytes, no `Content-Type` |
+| HTTP 200 acceptance | **VERIFIED** | Seed Live reported success |
+| HTTP failure behavior | **VERIFIED FOR TEST TRANSPORT** | 500 marks Transport Status "Invalid" immediately |
+| Retry behavior | **NOT VERIFIED** | No second request in a >3 min observation. Absence for Test Transport says nothing about generated reports |
+| Generated report filename | **NOT VERIFIED** | `testTransportFileName` is a literal placeholder, not a real filename |
+| Generated report Content-Type | **NOT VERIFIED** | Test Transport sends none |
+| Compression / ZIP behavior | **NOT VERIFIED** | Never observed on the wire |
+| Report schema | **SUPPORTED BY HISTORICAL EXPORT** | 16 columns, 1,586 rows. Downloaded, not delivered |
+| Report frequency / scheduling | **NOT VERIFIED** | |
+| Timestamp / timezone semantics | **PARTIAL** | Format verified; **0 of 1,586** rows carry any timezone marker |
+| Provider transaction identity | **PARTIAL** | `Tran #` unique 1,586/1,586 **within one export**. Global uniqueness NOT VERIFIED |
+| Machine / device identity | **PARTIAL** | `Device` to `Terminal` exactly 1:1 (12/12/12) within one export |
+| Selection / coil identity | **NOT VERIFIED** | `Details` holds 385 distinct short codes; their relation to Coil Name is unproven |
+
+## 14.3 New findings from this revalidation
+
+Four things this audit established that were not previously recorded:
+
+1. **Seed Live types refunds *and* signs them.** The export carries
+   `Trans Type = Refund` on exactly 1 row, and exactly 1 row has a negative
+   `Amount` — the same row. The provider supplies **both** signals. This is
+   direct evidence for **ADR-0003 D3c**: SmartVend takes the *type* as canonical
+   meaning and normalizes the amount to a positive magnitude, with the sign
+   remaining a provider-boundary detail.
+2. **Seed Live does expose a `Currency` field in at least one report type.** The
+   Activity export header contains `Currency`; the Transactions export does not.
+   The currency debt deferred in ADR-0003 is therefore resolvable from the
+   provider when it matters, rather than being unavailable.
+3. **`AP Code` is a card-processing artifact, not a selection code.** It is blank
+   on exactly the 288 `Cash` rows and blank on **zero** non-Cash rows, with 1,294
+   distinct values. It must not be mistaken for a selection identifier.
+4. **`Trans Type` carries 7 real values** — `Cash`, `Credit`, `Refund`, and four
+   EMV/wallet variants — against a canonical `payment_method` of `cash|cashless`.
+   Confirms that debt is real but non-blocking: the detail survives in the artifact.
+
+## 14.4 Real generated report delivery: characterized, external validation pending
+
+**Subtask status: DONE — external validation pending.** The requirement was to
+obtain **or characterize** real generated report delivery. Characterization is
+complete; what remains is an external validation gap, not unfinished
+investigation work.
+
+**Evidence status: NOT VERIFIED.** No real generated HTTP report delivery exists,
+and none was manufactured to close this gap.
+
+The account has verified activity in **September 2025** and is dormant through
+the sampled 2026 window. Sent Reports history returns "No data found" for the
+confirmed-active period, so retrieving an already-generated file is not a route.
+Obtaining one requires **generating** a Single Transaction Data Export over a
+confirmed-active window and routing it through a registered HTTP transport, which
+needs all three of: an operator session in the Seed Live UI, a publicly reachable
+listener running at that moment, and a report batch that actually produces output.
+
+That is an **operator-dependent action, not a technical impossibility.**
+
+Historical export evidence establishes **schema feasibility**. It is not, and is
+not presented as, proof of HTTP-generated report delivery. Test Transport proves
+transport, authentication and connectivity only.
+
+## 14.5 Feasibility decision
+
+| # | Question | Answer |
+| --- | --- | --- |
+| A | Connect over a supported transport? | **Yes, VERIFIED.** 8 real Seed Live HTTP POST deliveries |
+| B | Authenticate inbound Seed Live traffic? | **Yes, VERIFIED.** Basic auth observed; `BasicAuthenticator` implemented and tested |
+| C | Receive arbitrary bytes through that transport? | **Yes for our endpoint**, byte-exact and tested to 25 MB including binary. Seed Live has only ever sent 33 bytes of text |
+| D | Authentic Seed Live data sufficient to prove interpretability? | **Yes, SUPPORTED BY HISTORICAL EXPORT.** 1,586 real rows, 16 columns, stable structure |
+| E | Enough to build the MVP inbound integration without inventing the contract? | **Yes.** Transport and auth verified; schema from authentic data; unknowns representable |
+| F | Is any remaining unknown a fundamental feasibility blocker? | **No** |
+| G | What needs an active account later? | See 14.6 |
+
+### DECISION: FEASIBLE
+
+Every link in the feasibility chain is evidenced. Seed Live sends over a supported
+HTTP transport; our endpoint receives and authenticates it; authentic Seed Live
+transaction data has a usable, stable structure; machine identity
+(`Device`/`Terminal`) and transaction identity (`Tran #`) are technically mappable
+through the Task 2 `ExternalIdentity` crosswalk; and the genuinely unresolved item,
+selection to product, is representable as `UNRESOLVED` rather than silently lost,
+which is precisely what that model exists for.
+
+This is **not** "FEASIBLE because HTTP POST works." Transport alone would not
+justify it. The conclusion rests equally on 1,586 rows of authentic Seed Live
+transaction data whose structure SmartVend can interpret.
+
+**Honest statement of the limit:** the end-to-end generated report -> HTTP
+delivery -> parse path has not yet been demonstrated and must be validated with
+an active Seed Live account.
+
+It is classified as a sequencing risk rather than a feasibility blocker because
+the artifact layer preserves bytes regardless of framing, so a surprise in
+filename, `Content-Type`, compression or chunking changes parser input, not
+whether integration is possible. This should still be the **first** thing
+validated once account access exists.
+
+## 14.6 Requires an active client / provider account
+
+1. **A real generated report delivery** — filename, `Content-Type`, compression or
+   ZIP framing, chunking, and whether a report type is conveyed at all.
+2. **Generated-report authentication** — whether it authenticates identically to
+   Test Transport. Gates route registration.
+3. **Delivery and retry semantics** — retry policy, backoff, at-least-once
+   behavior, and the correct response for a backend outage. Until then
+   `BACKEND_UNAVAILABLE_STATUS_PROVISIONAL` stays provisional.
+4. **Selection to product resolution** — needs an active account producing a
+   Transaction Line Item export, a provider file specification, a planogram
+   export, or another authorized account with line-item history.
+5. **Global uniqueness of `Tran #`** beyond one export.
+6. **Timezone semantics** for the `Date` column.
+
+None blocks starting MVP implementation. All block *completing* it.

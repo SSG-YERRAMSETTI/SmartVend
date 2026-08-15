@@ -34,6 +34,60 @@ pushes to it.
 
 ## Current milestone
 
+### PLATFORM TASK 3 — Seed Live feasibility: **FEASIBLE**, 2026-08-15
+
+**"Own the Cantaloupe / Seed Live investigation and integration."** Pre-approval
+MVP feasibility proof. **Investigation and decision only — no code changed.**
+
+Evidence and decision are recorded in
+`docs/integrations/CANTALOUPE_SEEDLIVE_INTEGRATION.md` §14. No new experiment was
+run; the Cloudflare tunnel and capture harness stayed **shut down**, because every
+Test Transport question they could answer is already answered.
+
+**Verified from disk, not from prior summaries:** 10 captures, of which **8 are
+real Seed Live Test Transport deliveries**, all byte-identical at 33 bytes, plus 2
+of our own preflights. Seed Live's client is `Apache-HttpClient/4.5.14 (Java/17)`
+over HTTP/1.1. Historical export re-checked: 1,586 rows, 16 columns, `Tran #`
+unique 1,586/1,586 within the export, `Device`/`Terminal` exactly 1:1 (12/12/12),
+0 of 1,586 dates carry a timezone marker.
+
+**Four new findings.** Seed Live types refunds **and** signs them — one row is
+`Trans Type = Refund` and the same single row is negative — which is direct
+evidence for ADR-0003 D3c taking the type as canonical and normalizing the sign.
+Seed Live **does** expose `Currency` in the Activity report type, so the deferred
+currency debt is resolvable from the provider. `AP Code` is blank on exactly the
+288 Cash rows and zero non-Cash rows, so it is a card-processing artifact and not
+a selection code. `Trans Type` has 7 real values against a canonical
+`cash|cashless`.
+
+**Subtask 3.2 is DONE with external validation pending:** characterization is
+complete, and what remains is an external gap rather than unfinished work.
+**Real generated HTTP report delivery is NOT VERIFIED**, and nothing was
+fabricated to close that. The account is active in September 2025, dormant in the
+sampled 2026 window, and Sent Reports holds no retrievable file for the active
+period. Obtaining one needs an operator session, a live listener, and a real
+report batch simultaneously — operator-dependent, not technically impossible.
+
+**Decision: FEASIBLE.** Transport, authentication and byte receipt are VERIFIED;
+usable Seed Live transaction structure is SUPPORTED BY HISTORICAL EXPORT; machine
+and transaction identity are mappable through the Task 2 `ExternalIdentity`
+crosswalk; and selection-to-product stays representable as `UNRESOLVED` rather
+than lost. Not "feasible because HTTP POST works" — the conclusion rests equally
+on 1,586 rows of authentic provider data.
+
+**Stated limitation, unweakened:** the end-to-end generated report -> HTTP
+delivery -> parse path has not yet been demonstrated and must be validated with
+an active Seed Live account. It is the **first** thing to validate once access
+exists.
+
+**Platform Task 4** ("Document Seed Live report types, transport options,
+schemas, frequencies, and delivery behavior") is **deferred and not required for
+the pre-approval MVP proof.** Task 3 captured enough provider evidence. Formalize
+the full provider contract after approval, or when real generated-report evidence
+becomes available.
+
+---
+
 ### PLATFORM TASK 2 — control-plane models, 2026-08-15
 
 **"Define tenant isolation, external identity mapping, connection records,
